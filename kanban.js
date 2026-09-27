@@ -2,11 +2,10 @@ class FreeKanban {
     constructor() {
         this.tasks = [];
         this.columns = [
-            { id: 'backlog', title: 'Backlog', order: 0 },
-            { id: 'todo', title: 'To Do', order: 1 },
-            { id: 'in-progress', title: 'In Progress', order: 2 },
-            { id: 'review', title: 'Review', order: 3 },
-            { id: 'done', title: 'Done', order: 4 }
+            { id: 'backlog', title: 'Backlog', order: 0, color: '#a855f7' },
+            { id: 'todo', title: 'To Do', order: 1, color: '#ef4444' },
+            { id: 'in-progress', title: 'In Progress', order: 2, color: '#eab308' },
+            { id: 'done', title: 'Done', order: 3, color: '#22c55e' }
         ];
         this.currentTaskId = null;
         this.currentColumn = 'todo';
@@ -16,7 +15,7 @@ class FreeKanban {
         this.currentBoardId = null; // Track current board ID
         this.currentBoardName = 'My Projects';
         this.savedBoards = {};
-        this.currentColumnLayout = 3;
+        this.currentColumnLayout = 4;
         
         this.init();
     }
@@ -35,7 +34,7 @@ class FreeKanban {
         this.updateDensityButton();
 
         // Load column layout preference
-        const savedLayout = parseInt(localStorage.getItem('kanban-column-layout')) || 5;
+        const savedLayout = parseInt(localStorage.getItem('kanban-column-layout')) || 4;
         this.currentColumnLayout = savedLayout;
         this.changeColumnLayout(savedLayout);
         this.updateLayoutButton();
@@ -45,9 +44,6 @@ class FreeKanban {
         
         // Load the current board or create default
         this.loadCurrentBoard();
-        
-        // Check if there's a URL override (this will override the loaded data)
-        this.loadFromUrl();
         
         this.initializeBoardName();
         
@@ -76,18 +72,6 @@ class FreeKanban {
             const value = e.target.value;
             const display = e.target.nextElementSibling;
             display.textContent = `${value}%`;
-        });
-
-        document.getElementById('task-fun').addEventListener('input', (e) => {
-            const value = e.target.value;
-            const display = e.target.nextElementSibling;
-            display.textContent = `${value} / 5`;
-        });
-
-        document.getElementById('task-monetization').addEventListener('input', (e) => {
-            const value = e.target.value;
-            const display = e.target.nextElementSibling;
-            display.textContent = `${value} / 5`;
         });
 
         // Touch support for mobile
@@ -408,107 +392,58 @@ class FreeKanban {
                 tasks: [
                     {
                         id: 'demo-1',
-                        title: 'Brainstorm new ideas',
-                        description: 'Take 15 minutes to write down any ideas that come to mind. No filtering!',
+                        title: 'Kanban App Project',
+                        description: 'Build Cool Kanban app with easy customization!',
                         column: 'backlog',
-                        difficulty: 1,
+                        difficulty: 2,
                         progress: 0,
                         priority: 'low',
-                        funFactor: 5,
-                        monetization: 2,
-                        timeEstimate: '15 min',
-                        categories: ['creativity'],
-                        color: '#a855f7',
+                        color: '',
                         createdAt: now,
                         updatedAt: now
                     },
                     {
                         id: 'demo-2',
-                        title: 'Learn something new',
-                        description: 'Pick a tutorial, article, or video. Spend 30 min learning.',
-                        column: 'backlog',
-                        difficulty: 2,
+                        title: 'College Assignment',
+                        description: 'Deadline on 30 Sept',
+                        column: 'todo',
+                        difficulty: 1,
                         progress: 0,
-                        priority: 'low',
-                        funFactor: 4,
-                        monetization: 3,
-                        timeEstimate: '30 min',
-                        categories: ['learning'],
-                        color: '#3b82f6',
+                        priority: 'medium',
+                        color: '',
                         createdAt: now,
                         updatedAt: now
                     },
                     {
                         id: 'demo-3',
-                        title: 'Review weekly goals',
-                        description: 'Check progress on this week\'s priorities. Adjust if needed.',
-                        column: 'todo',
-                        difficulty: 1,
-                        progress: 0,
-                        priority: 'medium',
-                        funFactor: 2,
-                        monetization: 3,
-                        timeEstimate: '10 min',
-                        categories: ['planning'],
-                        color: '#eab308',
+                        title: 'Intern Project',
+                        description: 'Debugging backend system',
+                        column: 'in-progress',
+                        difficulty: 3,
+                        progress: 40,
+                        priority: 'high',
+                        color: '',
                         createdAt: now,
                         updatedAt: now
                     },
                     {
                         id: 'demo-4',
-                        title: 'Fix that annoying bug',
-                        description: 'You know the one. Time to squash it.',
-                        column: 'in-progress',
-                        difficulty: 3,
-                        progress: 40,
-                        priority: 'high',
-                        funFactor: 2,
-                        monetization: 4,
-                        timeEstimate: '1 hour',
-                        categories: ['bugfix'],
-                        color: '#ef4444',
-                        createdAt: now,
-                        updatedAt: now
-                    },
-                    {
-                        id: 'demo-5',
-                        title: 'Update documentation',
-                        description: 'Keep docs in sync with recent changes.',
-                        column: 'review',
-                        difficulty: 2,
-                        progress: 80,
-                        priority: 'medium',
-                        funFactor: 2,
-                        monetization: 2,
-                        timeEstimate: '30 min',
-                        categories: ['docs'],
-                        color: '#6b7280',
-                        createdAt: now,
-                        updatedAt: now
-                    },
-                    {
-                        id: 'demo-6',
-                        title: 'Ship first feature',
-                        description: 'Deployed to production. Celebrate!',
+                        title: 'Capstone Project',
+                        description: 'Deployed',
                         column: 'done',
                         difficulty: 4,
                         progress: 100,
                         priority: 'high',
-                        funFactor: 5,
-                        monetization: 5,
-                        timeEstimate: '2 days',
-                        categories: ['milestone'],
-                        color: '#22c55e',
+                        color: '',
                         createdAt: now,
                         updatedAt: now
                     }
                 ],
                 columns: [
-                    { id: 'backlog', title: 'Backlog', order: 0 },
-                    { id: 'todo', title: 'To Do', order: 1 },
-                    { id: 'in-progress', title: 'In Progress', order: 2 },
-                    { id: 'review', title: 'Review', order: 3 },
-                    { id: 'done', title: 'Done', order: 4 }
+                    { id: 'backlog', title: 'Backlog', order: 0, color: '#a855f7' },
+                    { id: 'todo', title: 'To Do', order: 1, color: '#ef4444' },
+                    { id: 'in-progress', title: 'In Progress', order: 2, color: '#eab308' },
+                    { id: 'done', title: 'Done', order: 3, color: '#22c55e' }
                 ],
                 lastModified: now,
                 createdAt: now
@@ -936,6 +871,42 @@ class FreeKanban {
                             <label class="form-label" for="column-title">Column Title</label>
                             <input type="text" class="form-input" id="column-title" required maxlength="50" placeholder="e.g., In Review">
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">Column Color</label>
+                            <div class="color-picker-container">
+                                <button type="button" class="color-option" data-color="" title="Default (no color)" onclick="kanban.selectColumnColor('')">
+                                    <span class="color-circle no-color">✕</span>
+                                </button>
+                                <button type="button" class="color-option" data-color="#ef4444" title="Red" onclick="kanban.selectColumnColor('#ef4444')">
+                                    <span class="color-circle" style="background: #ef4444"></span>
+                                </button>
+                                <button type="button" class="color-option" data-color="#f97316" title="Orange" onclick="kanban.selectColumnColor('#f97316')">
+                                    <span class="color-circle" style="background: #f97316"></span>
+                                </button>
+                                <button type="button" class="color-option" data-color="#eab308" title="Yellow" onclick="kanban.selectColumnColor('#eab308')">
+                                    <span class="color-circle" style="background: #eab308"></span>
+                                </button>
+                                <button type="button" class="color-option" data-color="#22c55e" title="Green" onclick="kanban.selectColumnColor('#22c55e')">
+                                    <span class="color-circle" style="background: #22c55e"></span>
+                                </button>
+                                <button type="button" class="color-option" data-color="#3b82f6" title="Blue" onclick="kanban.selectColumnColor('#3b82f6')">
+                                    <span class="color-circle" style="background: #3b82f6"></span>
+                                </button>
+                                <button type="button" class="color-option" data-color="#a855f7" title="Purple" onclick="kanban.selectColumnColor('#a855f7')">
+                                    <span class="color-circle" style="background: #a855f7"></span>
+                                </button>
+                                <button type="button" class="color-option" data-color="#ec4899" title="Pink" onclick="kanban.selectColumnColor('#ec4899')">
+                                    <span class="color-circle" style="background: #ec4899"></span>
+                                </button>
+                                <button type="button" class="color-option" data-color="#6b7280" title="Gray" onclick="kanban.selectColumnColor('#6b7280')">
+                                    <span class="color-circle" style="background: #6b7280"></span>
+                                </button>
+                                <button type="button" class="color-option custom-color" title="Custom Color" onclick="kanban.openCustomColumnColorPicker()">
+                                    <span class="color-circle custom">+</span>
+                                </button>
+                            </div>
+                            <input type="hidden" id="column-color" value="">
+                        </div>
                         <div class="modal-actions">
                             <button type="button" class="btn btn-secondary" onclick="kanban.closeColumnModal()">Cancel</button>
                             <button type="submit" class="btn">Save Column</button>
@@ -955,10 +926,15 @@ class FreeKanban {
             if (column) {
                 title.textContent = 'Edit Column';
                 document.getElementById('column-title').value = column.title;
+                const color = column.color || '';
+                document.getElementById('column-color').value = color;
+                this.updateColumnColorPickerSelection(color);
             }
         } else {
             title.textContent = 'New Column';
             form.reset();
+            document.getElementById('column-color').value = '';
+            this.updateColumnColorPickerSelection('');
         }
 
         modal.classList.add('show');
@@ -977,19 +953,22 @@ class FreeKanban {
         
         const title = document.getElementById('column-title').value.trim();
         if (!title) return;
+        const color = document.getElementById('column-color').value || '';
 
         if (this.currentColumnId) {
             // Edit existing column
             const column = this.columns.find(c => c.id === this.currentColumnId);
             if (column) {
                 column.title = title;
+                column.color = color;
             }
         } else {
             // Add new column
             const newColumn = {
                 id: 'col-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
                 title: title,
-                order: this.columns.length
+                order: this.columns.length,
+                color: color
             };
             this.columns.push(newColumn);
         }
@@ -1101,79 +1080,6 @@ class FreeKanban {
                 this.showToast('Board cleared', 'info');
             }
         });
-    }
-
-    // URL Sharing
-    loadFromUrl() {
-        const hash = window.location.hash.substring(1);
-        if (hash) {
-            try {
-                const decoded = decodeURIComponent(atob(hash));
-                const data = JSON.parse(decoded);
-                
-                // Handle both old format (tasks only) and new format (complete board)
-                if (data.version === '2.0' || data.name || data.columns) {
-                    // New format with complete board data
-                    this.currentBoardName = data.name || 'Shared Board';
-                    this.tasks = data.tasks || [];
-                    this.columns = data.columns || [
-                        { id: 'todo', title: 'To Do', order: 0 },
-                        { id: 'in-progress', title: 'In Progress', order: 1 },
-                        { id: 'done', title: 'Done', order: 2 }
-                    ];
-                    
-                    // Update board name in UI
-                    const boardNameInput = document.getElementById('board-name');
-                    if (boardNameInput) {
-                        boardNameInput.value = this.currentBoardName;
-                    }
-                } else {
-                    // Legacy format - just tasks
-                    this.tasks = data.tasks || [];
-                }
-                
-                this.renderBoard();
-                this.showToast('Board loaded from shared link', 'success');
-                // Clear the hash after loading
-                window.history.replaceState(null, null, window.location.pathname);
-                return true;
-            } catch (e) {
-                console.error('Failed to load from URL:', e);
-                this.showToast('Invalid share link', 'error');
-            }
-        }
-        return false;
-    }
-
-    shareBoard() {
-        // Feature temporarily disabled - show coming soon message
-        this.showToast('Share via link coming soon! Stay tuned.', 'info');
-    }
-
-    async copyShareLink() {
-        const input = document.getElementById('share-link');
-        const url = input.value;
-        
-        try {
-            // Modern clipboard API
-            if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(url);
-                this.showToast('Link copied to clipboard!', 'success');
-            } else {
-                // Fallback for older browsers
-                input.select();
-                input.setSelectionRange(0, 99999);
-                document.execCommand('copy');
-                this.showToast('Link copied to clipboard!', 'success');
-            }
-        } catch (e) {
-            console.error('Copy failed:', e);
-            this.showToast('Failed to copy link', 'error');
-        }
-    }
-
-    closeShareModal() {
-        document.getElementById('share-modal').classList.remove('show');
     }
 
     // Import/Export
@@ -1434,11 +1340,9 @@ class FreeKanban {
             // Reset slider displays
             document.getElementById('task-difficulty').nextElementSibling.textContent = '3 / 5';
             document.getElementById('task-progress').nextElementSibling.textContent = '0%';
-            document.getElementById('task-fun').nextElementSibling.textContent = '3 / 5';
-            document.getElementById('task-monetization').nextElementSibling.textContent = '3 / 5';
-            // Reset color to default
-            document.getElementById('task-color').value = '#3b82f6';
-            this.updateColorPickerSelection('#3b82f6');
+            // Reset color to no color
+            document.getElementById('task-color').value = '';
+            this.updateColorPickerSelection('');
         }
         
         modal.classList.add('show');
@@ -1450,42 +1354,20 @@ class FreeKanban {
         
         const difficultySlider = document.getElementById('task-difficulty');
         const progressSlider = document.getElementById('task-progress');
-        const funSlider = document.getElementById('task-fun');
-        const monetizationSlider = document.getElementById('task-monetization');
         
         difficultySlider.value = task.difficulty || 3;
         progressSlider.value = task.progress || 0;
-        funSlider.value = task.funFactor || 3;
-        monetizationSlider.value = task.monetization || 3;
         
         // Update displays
         difficultySlider.nextElementSibling.textContent = `${task.difficulty || 3} / 5`;
         progressSlider.nextElementSibling.textContent = `${task.progress || 0}%`;
-        funSlider.nextElementSibling.textContent = `${task.funFactor || 3} / 5`;
-        monetizationSlider.nextElementSibling.textContent = `${task.monetization || 3} / 5`;
         
         document.getElementById('task-priority').value = task.priority || 'medium';
-        document.getElementById('task-time').value = task.timeEstimate || '';
-        document.getElementById('task-categories').value = (task.categories || []).join(', ');
         
         // Set task color
-        const color = task.color || '#3b82f6';
+        const color = (task.color === undefined || task.color === null) ? '#3b82f6' : task.color;
         document.getElementById('task-color').value = color;
         this.updateColorPickerSelection(color);
-    }
-
-    setStarRating(rating) {
-        document.getElementById('task-fun').value = rating;
-        document.querySelectorAll('.star').forEach((star, index) => {
-            star.classList.toggle('active', index < rating);
-        });
-    }
-
-    setMoneyRating(rating) {
-        document.getElementById('task-monetization').value = rating;
-        document.querySelectorAll('.money').forEach((money, index) => {
-            money.classList.toggle('active', index < rating);
-        });
     }
 
     closeTaskModal() {
@@ -1504,14 +1386,7 @@ class FreeKanban {
             difficulty: parseInt(document.getElementById('task-difficulty').value),
             progress: parseInt(document.getElementById('task-progress').value),
             priority: document.getElementById('task-priority').value,
-            funFactor: parseInt(document.getElementById('task-fun').value),
-            monetization: parseInt(document.getElementById('task-monetization').value),
-            timeEstimate: document.getElementById('task-time').value,
-            categories: document.getElementById('task-categories').value
-                .split(',')
-                .map(c => c.trim())
-                .filter(c => c),
-            color: document.getElementById('task-color').value || '#3b82f6',
+            color: document.getElementById('task-color').value,
             createdAt: this.currentTaskId ? 
                 (this.tasks.find(t => t.id === this.currentTaskId)?.createdAt || new Date().toISOString()) : 
                 new Date().toISOString(),
@@ -1602,7 +1477,7 @@ class FreeKanban {
         const matches = this.tasks.filter(task => 
             task.title.toLowerCase().includes(this.searchTerm) ||
             task.description.toLowerCase().includes(this.searchTerm) ||
-            task.categories.some(cat => cat.toLowerCase().includes(this.searchTerm))
+            (task.categories && task.categories.some(cat => cat.toLowerCase().includes(this.searchTerm)))
         );
         
         if (matches.length === 0) {
@@ -1652,10 +1527,14 @@ class FreeKanban {
             const columnElement = document.createElement('div');
             columnElement.className = 'column';
             columnElement.setAttribute('data-column', column.id);
+            if (column.color) {
+                columnElement.style.background = `linear-gradient(${column.color}2e, ${column.color}2e), var(--bg-card)`;
+                columnElement.style.borderColor = `${column.color}80`;
+            }
             
             columnElement.innerHTML = `
                 <div class="column-header">
-                    <div class="column-title">${this.escapeHtml(column.title)}</div>
+                    <div class="column-title">${column.color ? `<span class="column-color-dot" style="background: ${column.color}"></span>` : ''}${this.escapeHtml(column.title)}</div>
                     <div class="column-menu-container">
                         <button class="btn btn-secondary btn-icon column-menu-btn" onclick="kanban.toggleColumnMenu('${column.id}')" title="Column Options">⋯</button>
                         <div class="column-menu" id="menu-${column.id}">
@@ -1712,10 +1591,11 @@ class FreeKanban {
     }
 
     renderTaskCard(task) {
-        const color = task.color || '#3b82f6';
+        const color = (task.color === undefined || task.color === null) ? '#3b82f6' : task.color;
+        const colorStyle = color ? `border-left: 4px solid ${color}; background: linear-gradient(90deg, ${color}15 0%, transparent 40%);` : '';
         return `
             <div class="task-card" draggable="true" data-task-id="${task.id}" 
-                 style="border-left: 4px solid ${color}; background: linear-gradient(90deg, ${color}15 0%, transparent 40%);"
+                 style="${colorStyle}"
                  ondragstart="kanban.drag(event)" ondragend="kanban.dragEnd(event)">
                 <div class="task-header">
                     <div class="task-title">${this.escapeHtml(task.title)}</div>
@@ -1736,14 +1616,6 @@ class FreeKanban {
                         <span class="metric-label">Priority</span>
                         <span class="priority-badge priority-${task.priority}">${task.priority === 'medium' ? 'MED' : task.priority.toUpperCase()}</span>
                     </div>
-                    <div class="metric-item">
-                        <span class="metric-label">Fun</span>
-                        <span class="metric-value">${task.funFactor}/5</span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="metric-label">Money</span>
-                        <span class="metric-value">${task.monetization}/5</span>
-                    </div>
                 </div>
                 
                 <div class="progress-bar">
@@ -1754,14 +1626,6 @@ class FreeKanban {
                     <span class="priority-badge priority-${task.priority}">${task.priority.substr(0,1).toUpperCase()}</span>
                     <span class="progress-indicator">${task.progress}%</span>
                 </div>
-                
-                ${task.categories && task.categories.length > 0 ? `
-                    <div class="task-tags">
-                        ${(Array.isArray(task.categories) ? task.categories : task.categories.split(',').map(c => c.trim()).filter(c => c)).map(cat =>
-                            `<span class="tag">${this.escapeHtml(cat)}</span>`
-                        ).join('')}
-                    </div>
-                ` : ''}
             </div>
         `;
     }
@@ -1961,6 +1825,34 @@ class FreeKanban {
         input.value = document.getElementById('task-color').value || '#3b82f6';
         input.onchange = (e) => {
             this.selectTaskColor(e.target.value);
+        };
+        input.click();
+    }
+
+    // Column Color Selection Functions
+    selectColumnColor(color) {
+        document.getElementById('column-color').value = color;
+        this.updateColumnColorPickerSelection(color);
+    }
+
+    updateColumnColorPickerSelection(color) {
+        const container = document.querySelector('#column-modal .color-picker-container');
+        if (!container) return;
+
+        container.querySelectorAll('.color-option').forEach(btn => {
+            btn.classList.remove('selected');
+            if (btn.dataset.color === color) {
+                btn.classList.add('selected');
+            }
+        });
+    }
+
+    openCustomColumnColorPicker() {
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = document.getElementById('column-color').value || '#3b82f6';
+        input.onchange = (e) => {
+            this.selectColumnColor(e.target.value);
         };
         input.click();
     }

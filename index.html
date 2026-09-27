@@ -3,27 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FreeKanban Board - Task Management Tool</title>
-    
-    <!-- SEO Meta Tags -->
-    <meta name="description" content="Free online kanban board for task management. No signup required, works offline, supports multiple boards with URL sharing.">
-    <meta name="keywords" content="kanban board, task management, project management, free kanban, agile tools, productivity, todo list">
-    <meta name="author" content="FreeKanban">
-    <meta name="robots" content="index, follow">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://freekanban.com/kanban.html">
-    <meta property="og:title" content="FreeKanban Board - Simple Task Management Tool">
-    <meta property="og:description" content="Powerful, distraction-free kanban board for organizing tasks. No signup required, works offline.">
-    
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="FreeKanban Board - Simple Task Management Tool">
-    <meta name="twitter:description" content="Powerful, distraction-free kanban board for organizing tasks. No signup required, works offline.">
-    
-    <!-- Canonical URL -->
-    <link rel="canonical" href="https://freekanban.com/kanban.html">
+    <title>EasyKanban Board - Task Management Tool</title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -31,48 +11,14 @@
     
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
-    
-    <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "FreeKanban Board",
-        "description": "Interactive kanban board for task management. Create, organize, and track tasks with multiple boards, themes, and sharing capabilities.",
-        "url": "https://freekanban.com/kanban.html",
-        "applicationCategory": "ProductivityApplication",
-        "operatingSystem": "Web Browser",
-        "browserRequirements": "Requires JavaScript enabled",
-        "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
-        },
-        "provider": {
-            "@type": "Organization",
-            "name": "FreeKanban",
-            "url": "https://freekanban.com"
-        }
-    }
-    </script>
 </head>
-
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-46EHX9VB1F"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-46EHX9VB1F');
-</script>
 
 <body data-theme="black">
     <header class="header">
         <div class="container">
             <div class="header-content">
                 <div class="header-left">
-                    <a href="index.html" class="logo">← FreeKanban</a>
+                    <a href="index.html" class="logo">EasyKanban</a>
                     <div class="board-name-container">
                         <input type="text" class="board-name-input" id="board-name" placeholder="My Board" maxlength="50">
                         <button class="btn btn-secondary btn-icon" onclick="kanban.saveCurrentBoard(); kanban.showToast('Board saved', 'success')" title="Save Board" id="save-button">💾</button>
@@ -85,7 +31,6 @@
                     <button class="btn btn-secondary btn-icon" onclick="kanban.cycleColumnLayout()" title="Change Column Layout" id="layout-button">3⚏</button>
                     <button class="btn btn-secondary btn-icon" onclick="kanban.exportBoard()" title="Export">↑</button>
                     <button class="btn btn-secondary btn-icon" onclick="kanban.importBoard()" title="Import">↓</button>
-                    <button class="btn btn-secondary btn-icon" onclick="kanban.shareBoard()" title="Share">⇗</button>
                     <button class="btn btn-secondary btn-icon" onclick="kanban.cycleTheme()" title="Change Theme" id="theme-button">☀️</button>
                     <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" title="Menu" aria-label="Toggle mobile menu">☰</button>
                 </div>
@@ -132,49 +77,21 @@
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="task-priority">Priority Level</label>
-                        <select class="form-select" id="task-priority">
-                            <option value="low">Low Priority</option>
-                            <option value="medium" selected>Med Priority</option>
-                            <option value="high">High Priority</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="task-time">Time Estimate</label>
-                        <input type="text" class="form-input" id="task-time" placeholder="e.g., 2 hours, 1 day">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="task-priority">Priority Level</label>
+                    <select class="form-select" id="task-priority">
+                        <option value="low">Low Priority</option>
+                        <option value="medium" selected>Med Priority</option>
+                        <option value="high">High Priority</option>
+                    </select>
                 </div>
-
-                <details class="more-options">
-                    <summary class="more-options-toggle">More Options</summary>
-                    <div class="more-options-content">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label" for="task-fun">Fun Factor</label>
-                                <input type="range" class="slider" id="task-fun" min="1" max="5" value="3">
-                                <div class="slider-value">3 / 5</div>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="task-monetization">Monetization</label>
-                                <input type="range" class="slider" id="task-monetization" min="1" max="5" value="3">
-                                <div class="slider-value">3 / 5</div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="task-categories">Categories</label>
-                            <input type="text" class="form-input" id="task-categories" placeholder="personal, work, urgent">
-                        </div>
-                    </div>
-                </details>
 
                 <div class="form-group">
                     <label class="form-label">Task Color</label>
                     <div class="color-picker-container">
+                        <button type="button" class="color-option" data-color="" title="No color" onclick="kanban.selectTaskColor('')">
+                            <span class="color-circle no-color">✕</span>
+                        </button>
                         <button type="button" class="color-option" data-color="#ef4444" title="Red - Urgent/Critical" onclick="kanban.selectTaskColor('#ef4444')">
                             <span class="color-circle" style="background: #ef4444"></span>
                         </button>
@@ -211,24 +128,6 @@
                     <button type="submit" class="btn">Save Task</button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- Share Modal -->
-    <div id="share-modal" class="modal">
-        <div class="modal-content modal-small">
-            <div class="modal-header">
-                <h2 class="modal-title">Share Board</h2>
-                <button class="modal-close" onclick="kanban.closeShareModal()">×</button>
-            </div>
-            <div class="share-content">
-                <p class="share-description">Copy this link to share your board with others:</p>
-                <div class="share-link-container">
-                    <input type="text" id="share-link" class="share-input" readonly>
-                    <button class="btn btn-primary" onclick="kanban.copyShareLink()">Copy</button>
-                </div>
-                <p class="share-note">This link contains your entire board data. Anyone with this link can view and import your board.</p>
-            </div>
         </div>
     </div>
 
