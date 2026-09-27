@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreeKanban Board - Task Management Tool</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Free online kanban board for task management. No signup required, works offline, supports multiple boards with URL sharing.">
+    <meta name="keywords" content="kanban board, task management, project management, free kanban, agile tools, productivity, todo list">
+    <meta name="author" content="FreeKanban">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://freekanban.com/kanban.html">
+    <meta property="og:title" content="FreeKanban Board - Simple Task Management Tool">
+    <meta property="og:description" content="Powerful, distraction-free kanban board for organizing tasks. No signup required, works offline.">
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="FreeKanban Board - Simple Task Management Tool">
+    <meta name="twitter:description" content="Powerful, distraction-free kanban board for organizing tasks. No signup required, works offline.">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://freekanban.com/kanban.html">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "FreeKanban Board",
+        "description": "Interactive kanban board for task management. Create, organize, and track tasks with multiple boards, themes, and sharing capabilities.",
+        "url": "https://freekanban.com/kanban.html",
+        "applicationCategory": "ProductivityApplication",
+        "operatingSystem": "Web Browser",
+        "browserRequirements": "Requires JavaScript enabled",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "provider": {
+            "@type": "Organization",
+            "name": "FreeKanban",
+            "url": "https://freekanban.com"
+        }
+    }
+    </script>
+</head>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-46EHX9VB1F"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-46EHX9VB1F');
+</script>
+
+<body data-theme="black">
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-left">
+                    <a href="index.html" class="logo">← FreeKanban</a>
+                    <div class="board-name-container">
+                        <input type="text" class="board-name-input" id="board-name" placeholder="My Board" maxlength="50">
+                        <button class="btn btn-secondary btn-icon" onclick="kanban.saveCurrentBoard(); kanban.showToast('Board saved', 'success')" title="Save Board" id="save-button">💾</button>
+                        <button class="btn btn-primary btn-icon" onclick="kanban.openBoardManager()" title="My Boards" id="boards-button">📚</button>
+                    </div>
+                </div>
+                <div class="header-controls">
+                    <input type="text" class="search-box" placeholder="Search tasks..." id="search-input">
+                    <button class="btn btn-secondary btn-icon" onclick="kanban.cycleDensity()" title="Change Density" id="density-button">📋</button>
+                    <button class="btn btn-secondary btn-icon" onclick="kanban.cycleColumnLayout()" title="Change Column Layout" id="layout-button">3⚏</button>
+                    <button class="btn btn-secondary btn-icon" onclick="kanban.exportBoard()" title="Export">↑</button>
+                    <button class="btn btn-secondary btn-icon" onclick="kanban.importBoard()" title="Import">↓</button>
+                    <button class="btn btn-secondary btn-icon" onclick="kanban.shareBoard()" title="Share">⇗</button>
+                    <button class="btn btn-secondary btn-icon" onclick="kanban.cycleTheme()" title="Change Theme" id="theme-button">☀️</button>
+                    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" title="Menu" aria-label="Toggle mobile menu">☰</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="board">
+                <!-- Columns will be dynamically generated by JavaScript -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Task Modal -->
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-title">New Task</h2>
+            </div>
+            <form id="task-form" onsubmit="kanban.saveTask(event)">
+                <div class="form-group">
+                    <label class="form-label" for="task-title">Task Title</label>
+                    <input type="text" class="form-input" id="task-title" required maxlength="100" placeholder="What needs to be done?">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="task-description">Description</label>
+                    <textarea class="form-textarea" id="task-description" rows="2" maxlength="500" placeholder="Add more details about this task..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="task-difficulty">Difficulty</label>
+                        <input type="range" class="slider" id="task-difficulty" min="1" max="5" value="3">
+                        <div class="slider-value">3 / 5</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="task-progress">Progress</label>
+                        <input type="range" class="slider" id="task-progress" min="0" max="100" value="0" step="10">
+                        <div class="slider-value">0%</div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="task-priority">Priority Level</label>
+                        <select class="form-select" id="task-priority">
+                            <option value="low">Low Priority</option>
+                            <option value="medium" selected>Med Priority</option>
+                            <option value="high">High Priority</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="task-time">Time Estimate</label>
+                        <input type="text" class="form-input" id="task-time" placeholder="e.g., 2 hours, 1 day">
+                    </div>
+                </div>
+
+                <details class="more-options">
+                    <summary class="more-options-toggle">More Options</summary>
+                    <div class="more-options-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="task-fun">Fun Factor</label>
+                                <input type="range" class="slider" id="task-fun" min="1" max="5" value="3">
+                                <div class="slider-value">3 / 5</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="task-monetization">Monetization</label>
+                                <input type="range" class="slider" id="task-monetization" min="1" max="5" value="3">
+                                <div class="slider-value">3 / 5</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="task-categories">Categories</label>
+                            <input type="text" class="form-input" id="task-categories" placeholder="personal, work, urgent">
+                        </div>
+                    </div>
+                </details>
+
+                <div class="form-group">
+                    <label class="form-label">Task Color</label>
+                    <div class="color-picker-container">
+                        <button type="button" class="color-option" data-color="#ef4444" title="Red - Urgent/Critical" onclick="kanban.selectTaskColor('#ef4444')">
+                            <span class="color-circle" style="background: #ef4444"></span>
+                        </button>
+                        <button type="button" class="color-option" data-color="#f97316" title="Orange - Important" onclick="kanban.selectTaskColor('#f97316')">
+                            <span class="color-circle" style="background: #f97316"></span>
+                        </button>
+                        <button type="button" class="color-option" data-color="#eab308" title="Yellow - Pending/Review" onclick="kanban.selectTaskColor('#eab308')">
+                            <span class="color-circle" style="background: #eab308"></span>
+                        </button>
+                        <button type="button" class="color-option" data-color="#22c55e" title="Green - Complete/Good" onclick="kanban.selectTaskColor('#22c55e')">
+                            <span class="color-circle" style="background: #22c55e"></span>
+                        </button>
+                        <button type="button" class="color-option" data-color="#3b82f6" title="Blue - Information/Default" onclick="kanban.selectTaskColor('#3b82f6')">
+                            <span class="color-circle" style="background: #3b82f6"></span>
+                        </button>
+                        <button type="button" class="color-option" data-color="#a855f7" title="Purple - Creative/Special" onclick="kanban.selectTaskColor('#a855f7')">
+                            <span class="color-circle" style="background: #a855f7"></span>
+                        </button>
+                        <button type="button" class="color-option" data-color="#ec4899" title="Pink - Personal" onclick="kanban.selectTaskColor('#ec4899')">
+                            <span class="color-circle" style="background: #ec4899"></span>
+                        </button>
+                        <button type="button" class="color-option" data-color="#6b7280" title="Gray - Low Priority" onclick="kanban.selectTaskColor('#6b7280')">
+                            <span class="color-circle" style="background: #6b7280"></span>
+                        </button>
+                        <button type="button" class="color-option custom-color" title="Custom Color" onclick="kanban.openCustomColorPicker()">
+                            <span class="color-circle custom">+</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="task-color" value="#3b82f6">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="kanban.closeTaskModal()">Cancel</button>
+                    <button type="submit" class="btn">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="share-modal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2 class="modal-title">Share Board</h2>
+                <button class="modal-close" onclick="kanban.closeShareModal()">×</button>
+            </div>
+            <div class="share-content">
+                <p class="share-description">Copy this link to share your board with others:</p>
+                <div class="share-link-container">
+                    <input type="text" id="share-link" class="share-input" readonly>
+                    <button class="btn btn-primary" onclick="kanban.copyShareLink()">Copy</button>
+                </div>
+                <p class="share-note">This link contains your entire board data. Anyone with this link can view and import your board.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Modal -->
+    <div id="search-modal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Search Tasks</h2>
+                <button class="modal-close" onclick="kanban.closeSearchModal()">×</button>
+            </div>
+            <div class="search-content">
+                <input type="text" id="search-input" placeholder="Search by title, description, or category..." 
+                       oninput="kanban.searchTasks(this.value)">
+                <div id="search-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Input (Hidden) -->
+    <input type="file" id="import-input" accept=".json" style="display: none;" onchange="kanban.handleImport(event)">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="kanban.js"></script>
+    
+    <script>
+        // Mobile menu functionality
+        function toggleMobileMenu() {
+            const navLinks = document.querySelector('.nav-links');
+            navLinks.classList.toggle('mobile-open');
+            
+            // Prevent body scroll when menu is open
+            if (navLinks.classList.contains('mobile-open')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Handle dropdown toggles in mobile menu
+        document.addEventListener('DOMContentLoaded', function() {
+            function setupMobileDropdowns() {
+                if (window.innerWidth <= 768) {
+                    const dropdownToggles = document.querySelectorAll('.nav-links .dropdown-toggle');
+                    
+                    dropdownToggles.forEach(toggle => {
+                        toggle.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            const dropdown = this.closest('.dropdown');
+                            
+                            document.querySelectorAll('.nav-links .dropdown.active').forEach(d => {
+                                if (d !== dropdown) d.classList.remove('active');
+                            });
+                            
+                            dropdown.classList.toggle('active');
+                        });
+                    });
+                }
+            }
+            
+            setupMobileDropdowns();
+            window.addEventListener('resize', setupMobileDropdowns);
+        });
+
+        // Close mobile menu when clicking outside or on links
+        document.addEventListener('click', function(event) {
+            const navLinks = document.querySelector('.nav-links');
+            const menuToggle = document.querySelector('.mobile-menu-toggle');
+            
+            if (navLinks && menuToggle && !navLinks.contains(event.target) && !menuToggle.contains(event.target)) {
+                navLinks.classList.remove('mobile-open');
+                document.body.style.overflow = '';
+            }
+            
+            if (event.target.matches('.nav-links > a, .nav-links .dropdown-menu a')) {
+                navLinks.classList.remove('mobile-open');
+                document.body.style.overflow = '';
+            }
+        });
+    </script>
+</body>
+</html>
