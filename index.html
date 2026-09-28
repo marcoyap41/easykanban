@@ -3,211 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EasyKanban Board - Task Management Tool</title>
-    
-    <!-- Favicon -->
+    <title>EasyKanban – personal task boards</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    
-    <!-- Stylesheet -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+<body data-theme="black" data-view="columns">
+<div class="app">
+    <aside class="rail" id="rail">
+        <a href="index.html" class="brand"><i></i>EasyKanban</a>
+        <section>
+            <div class="rail-head"><h3>Boards</h3><button class="link" onclick="kanban.openBoardManager()">Manage</button></div>
+            <div id="rail-boards"></div>
+            <button class="rail-item plus" onclick="kanban.createNewBoard()">+ New board</button>
+        </section>
+        <section>
+            <div class="rail-head"><h3>Stages</h3></div>
+            <nav id="rail-lanes"></nav>
+        </section>
+        <section>
+            <div class="rail-head"><h3>Display</h3></div>
+            <button class="rail-item" id="theme-button" onclick="kanban.cycleTheme()"><span class="g">Theme</span><em class="v"></em></button>
+            <button class="rail-item" id="density-button" onclick="kanban.cycleDensity()"><span class="g">Detail</span><em class="v"></em></button>
+            <button class="rail-item" id="layout-button" onclick="kanban.cycleColumnLayout()"><span class="g">Card size</span><em class="v"></em></button>
+            <button class="rail-item" onclick="kanban.exportBoard()"><span class="g">Export board</span></button>
+            <button class="rail-item" onclick="kanban.importBoard()"><span class="g">Import board</span></button>
+        </section>
+    </aside>
 
-<body data-theme="black">
-    <header class="header">
-        <div class="container">
-            <div class="header-content">
-                <div class="header-left">
-                    <a href="index.html" class="logo">EasyKanban</a>
-                    <div class="board-name-container">
-                        <input type="text" class="board-name-input" id="board-name" placeholder="My Board" maxlength="50">
-                        <button class="btn btn-secondary btn-icon" onclick="kanban.saveCurrentBoard(); kanban.showToast('Board saved', 'success')" title="Save Board" id="save-button">💾</button>
-                        <button class="btn btn-primary btn-icon" onclick="kanban.openBoardManager()" title="My Boards" id="boards-button">📚</button>
-                    </div>
-                </div>
-                <div class="header-controls">
-                    <input type="text" class="search-box" placeholder="Search tasks..." id="search-input">
-                    <button class="btn btn-secondary btn-icon" onclick="kanban.cycleDensity()" title="Change Density" id="density-button">📋</button>
-                    <button class="btn btn-secondary btn-icon" onclick="kanban.cycleColumnLayout()" title="Change Column Layout" id="layout-button">3⚏</button>
-                    <button class="btn btn-secondary btn-icon" onclick="kanban.exportBoard()" title="Export">↑</button>
-                    <button class="btn btn-secondary btn-icon" onclick="kanban.importBoard()" title="Import">↓</button>
-                    <button class="btn btn-secondary btn-icon" onclick="kanban.cycleTheme()" title="Change Theme" id="theme-button">☀️</button>
-                    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" title="Menu" aria-label="Toggle mobile menu">☰</button>
-                </div>
+    <div class="stage">
+        <header class="bar">
+            <button class="rail-toggle" onclick="toggleRail()" aria-label="Open sidebar">Menu</button>
+            <input type="text" class="title-input" id="board-name" placeholder="Untitled board" maxlength="50" aria-label="Board name">
+            <span class="summary" id="summary"></span>
+            <div class="view-toggle" role="group" aria-label="Board layout">
+                <button type="button" data-view-btn="columns" aria-pressed="false" onclick="kanban.changeView('columns')" title="Vertical columns">
+                    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1" y="2" width="4" height="12" rx="1"/><rect x="6" y="2" width="4" height="8" rx="1"/><rect x="11" y="2" width="4" height="10" rx="1"/></svg>Columns
+                </button>
+                <button type="button" data-view-btn="lanes" aria-pressed="true" onclick="kanban.changeView('lanes')" title="Horizontal lanes">
+                    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1" y="1" width="12" height="4" rx="1"/><rect x="1" y="6" width="8" height="4" rx="1"/><rect x="1" y="11" width="14" height="4" rx="1"/></svg>Lanes
+                </button>
             </div>
-        </div>
-    </header>
-
-    <main class="main-content">
-        <div class="container">
-            <div class="board">
-                <!-- Columns will be dynamically generated by JavaScript -->
-            </div>
-        </div>
-    </main>
-
-    <!-- Task Modal -->
-    <div id="task-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title" id="modal-title">New Task</h2>
-            </div>
-            <form id="task-form" onsubmit="kanban.saveTask(event)">
-                <div class="form-group">
-                    <label class="form-label" for="task-title">Task Title</label>
-                    <input type="text" class="form-input" id="task-title" required maxlength="100" placeholder="What needs to be done?">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="task-description">Description</label>
-                    <textarea class="form-textarea" id="task-description" rows="2" maxlength="500" placeholder="Add more details about this task..."></textarea>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="task-difficulty">Difficulty</label>
-                        <input type="range" class="slider" id="task-difficulty" min="1" max="5" value="3">
-                        <div class="slider-value">3 / 5</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="task-progress">Progress</label>
-                        <input type="range" class="slider" id="task-progress" min="0" max="100" value="0" step="10">
-                        <div class="slider-value">0%</div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="task-priority">Priority Level</label>
-                    <select class="form-select" id="task-priority">
-                        <option value="low">Low Priority</option>
-                        <option value="medium" selected>Med Priority</option>
-                        <option value="high">High Priority</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Task Color</label>
-                    <div class="color-picker-container">
-                        <button type="button" class="color-option" data-color="" title="No color" onclick="kanban.selectTaskColor('')">
-                            <span class="color-circle no-color">✕</span>
-                        </button>
-                        <button type="button" class="color-option" data-color="#ef4444" title="Red - Urgent/Critical" onclick="kanban.selectTaskColor('#ef4444')">
-                            <span class="color-circle" style="background: #ef4444"></span>
-                        </button>
-                        <button type="button" class="color-option" data-color="#f97316" title="Orange - Important" onclick="kanban.selectTaskColor('#f97316')">
-                            <span class="color-circle" style="background: #f97316"></span>
-                        </button>
-                        <button type="button" class="color-option" data-color="#eab308" title="Yellow - Pending/Review" onclick="kanban.selectTaskColor('#eab308')">
-                            <span class="color-circle" style="background: #eab308"></span>
-                        </button>
-                        <button type="button" class="color-option" data-color="#22c55e" title="Green - Complete/Good" onclick="kanban.selectTaskColor('#22c55e')">
-                            <span class="color-circle" style="background: #22c55e"></span>
-                        </button>
-                        <button type="button" class="color-option" data-color="#3b82f6" title="Blue - Information/Default" onclick="kanban.selectTaskColor('#3b82f6')">
-                            <span class="color-circle" style="background: #3b82f6"></span>
-                        </button>
-                        <button type="button" class="color-option" data-color="#a855f7" title="Purple - Creative/Special" onclick="kanban.selectTaskColor('#a855f7')">
-                            <span class="color-circle" style="background: #a855f7"></span>
-                        </button>
-                        <button type="button" class="color-option" data-color="#ec4899" title="Pink - Personal" onclick="kanban.selectTaskColor('#ec4899')">
-                            <span class="color-circle" style="background: #ec4899"></span>
-                        </button>
-                        <button type="button" class="color-option" data-color="#6b7280" title="Gray - Low Priority" onclick="kanban.selectTaskColor('#6b7280')">
-                            <span class="color-circle" style="background: #6b7280"></span>
-                        </button>
-                        <button type="button" class="color-option custom-color" title="Custom Color" onclick="kanban.openCustomColorPicker()">
-                            <span class="color-circle custom">+</span>
-                        </button>
-                    </div>
-                    <input type="hidden" id="task-color" value="#3b82f6">
-                </div>
-
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="kanban.closeTaskModal()">Cancel</button>
-                    <button type="submit" class="btn">Save Task</button>
-                </div>
-            </form>
-        </div>
+            <input type="search" class="find" id="search-input" placeholder="Find a task" aria-label="Find a task">
+            <button class="btn" id="save-button" onclick="kanban.saveCurrentBoard(); kanban.showToast('Board saved', 'success')">Save</button>
+        </header>
+        <main class="board"></main>
     </div>
+</div>
 
-    <!-- Search Modal -->
-    <div id="search-modal" class="modal">
-        <div class="modal-content modal-small">
-            <div class="modal-header">
-                <h2>Search Tasks</h2>
-                <button class="modal-close" onclick="kanban.closeSearchModal()">×</button>
-            </div>
-            <div class="search-content">
-                <input type="text" id="search-input" placeholder="Search by title, description, or category..." 
-                       oninput="kanban.searchTasks(this.value)">
-                <div id="search-results"></div>
-            </div>
+<div id="task-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modal-title">New task</h2>
+            <button type="button" class="modal-close" onclick="kanban.closeTaskModal()" aria-label="Close">×</button>
         </div>
+        <form id="task-form" onsubmit="kanban.saveTask(event)">
+            <input type="text" class="form-input title-field" id="task-title" required maxlength="100" placeholder="What needs to be done?" aria-label="Task title">
+            <div class="form-group">
+                <textarea class="form-textarea" id="task-description" rows="3" maxlength="500" placeholder="Notes" aria-label="Notes"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="task-priority">Priority</label>
+                <select class="form-select" id="task-priority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="task-difficulty">Difficulty</label>
+                    <input type="range" class="slider" id="task-difficulty" min="1" max="5" value="3">
+                    <div class="slider-value">3 / 5</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="task-progress">Progress</label>
+                    <input type="range" class="slider" id="task-progress" min="0" max="100" value="0" step="10">
+                    <div class="slider-value">0%</div>
+                </div>
+            </div>
+            <div class="form-group">
+                <span class="form-label">Color tag</span>
+                <div class="color-picker-container">
+                    <button type="button" class="color-option" data-color="" title="No color" onclick="kanban.selectTaskColor('')"><span class="color-circle no-color">✕</span></button>
+                    <button type="button" class="color-option" data-color="#ef4444" title="Red" onclick="kanban.selectTaskColor('#ef4444')"><span class="color-circle" style="background:#ef4444"></span></button>
+                    <button type="button" class="color-option" data-color="#f97316" title="Orange" onclick="kanban.selectTaskColor('#f97316')"><span class="color-circle" style="background:#f97316"></span></button>
+                    <button type="button" class="color-option" data-color="#eab308" title="Yellow" onclick="kanban.selectTaskColor('#eab308')"><span class="color-circle" style="background:#eab308"></span></button>
+                    <button type="button" class="color-option" data-color="#22c55e" title="Green" onclick="kanban.selectTaskColor('#22c55e')"><span class="color-circle" style="background:#22c55e"></span></button>
+                    <button type="button" class="color-option" data-color="#3b82f6" title="Blue" onclick="kanban.selectTaskColor('#3b82f6')"><span class="color-circle" style="background:#3b82f6"></span></button>
+                    <button type="button" class="color-option" data-color="#a855f7" title="Purple" onclick="kanban.selectTaskColor('#a855f7')"><span class="color-circle" style="background:#a855f7"></span></button>
+                    <button type="button" class="color-option" data-color="#ec4899" title="Pink" onclick="kanban.selectTaskColor('#ec4899')"><span class="color-circle" style="background:#ec4899"></span></button>
+                    <button type="button" class="color-option" data-color="#6b7280" title="Gray" onclick="kanban.selectTaskColor('#6b7280')"><span class="color-circle" style="background:#6b7280"></span></button>
+                    <button type="button" class="color-option" title="Custom color" onclick="kanban.openCustomColorPicker()"><span class="color-circle custom">+</span></button>
+                </div>
+                <input type="hidden" id="task-color" value="#3b82f6">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="kanban.closeTaskModal()">Cancel</button>
+                <button type="submit" class="btn">Save task</button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Import Input (Hidden) -->
-    <input type="file" id="import-input" accept=".json" style="display: none;" onchange="kanban.handleImport(event)">
+<input type="file" id="import-input" accept=".json" style="display:none" onchange="kanban.handleImport(event)">
+<div id="toast" class="toast" role="status"></div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
-
-    <script src="kanban.js"></script>
-    
-    <script>
-        // Mobile menu functionality
-        function toggleMobileMenu() {
-            const navLinks = document.querySelector('.nav-links');
-            navLinks.classList.toggle('mobile-open');
-            
-            // Prevent body scroll when menu is open
-            if (navLinks.classList.contains('mobile-open')) {
-                document.body.style.overflow = 'hidden';
-            } else {
-                document.body.style.overflow = '';
-            }
-        }
-
-        // Handle dropdown toggles in mobile menu
-        document.addEventListener('DOMContentLoaded', function() {
-            function setupMobileDropdowns() {
-                if (window.innerWidth <= 768) {
-                    const dropdownToggles = document.querySelectorAll('.nav-links .dropdown-toggle');
-                    
-                    dropdownToggles.forEach(toggle => {
-                        toggle.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            const dropdown = this.closest('.dropdown');
-                            
-                            document.querySelectorAll('.nav-links .dropdown.active').forEach(d => {
-                                if (d !== dropdown) d.classList.remove('active');
-                            });
-                            
-                            dropdown.classList.toggle('active');
-                        });
-                    });
-                }
-            }
-            
-            setupMobileDropdowns();
-            window.addEventListener('resize', setupMobileDropdowns);
-        });
-
-        // Close mobile menu when clicking outside or on links
-        document.addEventListener('click', function(event) {
-            const navLinks = document.querySelector('.nav-links');
-            const menuToggle = document.querySelector('.mobile-menu-toggle');
-            
-            if (navLinks && menuToggle && !navLinks.contains(event.target) && !menuToggle.contains(event.target)) {
-                navLinks.classList.remove('mobile-open');
-                document.body.style.overflow = '';
-            }
-            
-            if (event.target.matches('.nav-links > a, .nav-links .dropdown-menu a')) {
-                navLinks.classList.remove('mobile-open');
-                document.body.style.overflow = '';
-            }
-        });
-    </script>
+<script src="kanban.js"></script>
+<script>
+function toggleRail(){document.body.classList.toggle('rail-open')}
+document.addEventListener('click',e=>{if(document.body.classList.contains('rail-open')&&!e.target.closest('.rail,.rail-toggle'))document.body.classList.remove('rail-open')});
+</script>
 </body>
 </html>

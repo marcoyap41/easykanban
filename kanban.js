@@ -1,4 +1,4 @@
-class FreeKanban {
+class EasyKanban {
     constructor() {
         this.tasks = [];
         this.columns = [
@@ -9,13 +9,14 @@ class FreeKanban {
         ];
         this.currentTaskId = null;
         this.currentColumn = 'todo';
-        this.draggedElement = null;
+        this.drag = null;
         this.searchTerm = '';
         this.currentDensity = 'comfortable';
         this.currentBoardId = null; // Track current board ID
         this.currentBoardName = 'My Projects';
         this.savedBoards = {};
         this.currentColumnLayout = 4;
+        this.currentView = 'columns';
         
         this.init();
     }
@@ -32,6 +33,9 @@ class FreeKanban {
         this.currentDensity = savedDensity;
         this.changeDensity(savedDensity);
         this.updateDensityButton();
+
+        // Load board layout mode (vertical columns or horizontal lanes)
+        this.changeView(localStorage.getItem('kanban-view') === 'lanes' ? 'lanes' : 'columns', false);
 
         // Load column layout preference
         const savedLayout = parseInt(localStorage.getItem('kanban-column-layout')) || 4;
@@ -74,10 +78,8 @@ class FreeKanban {
             display.textContent = `${value}%`;
         });
 
-        // Touch support for mobile
-        if ('ontouchstart' in window) {
-            this.initializeTouchSupport();
-        }
+        // Drag and drop (mouse, pen and touch share one pointer-based implementation)
+        this.initializeDragAndDrop();
 
         // Close modals on escape
         document.addEventListener('keydown', (e) => {
@@ -126,51 +128,7 @@ class FreeKanban {
                           description.includes(this.searchTerm) || 
                           tags.includes(this.searchTerm);
             
-            card.style.display = matches ? 'block' : 'none';
-        });
-    }
-
-    initializeTouchSupport() {
-        let touchItem = null;
-        let touchOffset = { x: 0, y: 0 };
-
-        document.querySelectorAll('.task-card').forEach(card => {
-            card.addEventListener('touchstart', (e) => {
-                touchItem = e.target.closest('.task-card');
-                const touch = e.touches[0];
-                const rect = touchItem.getBoundingClientRect();
-                touchOffset.x = touch.clientX - rect.left;
-                touchOffset.y = touch.clientY - rect.top;
-                touchItem.style.opacity = '0.5';
-            }, { passive: true });
-
-            card.addEventListener('touchmove', (e) => {
-                if (!touchItem) return;
-                e.preventDefault();
-                const touch = e.touches[0];
-                touchItem.style.position = 'fixed';
-                touchItem.style.left = `${touch.clientX - touchOffset.x}px`;
-                touchItem.style.top = `${touch.clientY - touchOffset.y}px`;
-                touchItem.style.zIndex = '1000';
-            });
-
-            card.addEventListener('touchend', (e) => {
-                if (!touchItem) return;
-                const touch = e.changedTouches[0];
-                const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
-                const column = dropTarget?.closest('.column');
-                
-                if (column) {
-                    const taskId = touchItem.dataset.taskId;
-                    const newColumn = column.dataset.column;
-                    this.moveTask(taskId, newColumn);
-                }
-
-                touchItem.style.position = '';
-                touchItem.style.opacity = '';
-                touchItem.style.zIndex = '';
-                touchItem = null;
-            });
+            card.style.display = matches ? '' : 'none';
         });
     }
 
@@ -201,12 +159,12 @@ class FreeKanban {
         
         const themeNames = {
             'white': 'Light Theme',
-            'grey': 'Warm Theme',
+            'grey': 'Dusk Theme',
             'black': 'Dark Theme'
         };
         
         if (button) {
-            button.textContent = themeEmojis[this.currentTheme];
+            button.querySelector('.v').textContent = themeNames[this.currentTheme].replace(' Theme', '');
             button.title = `Current: ${themeNames[this.currentTheme]} - Click to change`;
         }
     }
@@ -243,9 +201,27 @@ class FreeKanban {
         };
         
         if (button) {
-            button.textContent = densityEmojis[this.currentDensity];
+            button.querySelector('.v').textContent = densityNames[this.currentDensity].replace(' View', '');
             button.title = `Current: ${densityNames[this.currentDensity]} - Click to change`;
         }
+    }
+
+    // Board Layout Mode
+    changeView(view, rerender = true) {
+        this.currentView = view;
+        document.body.setAttribute('data-view', view);
+        localStorage.setItem('kanban-view', view);
+        document.querySelectorAll('[data-view-btn]').forEach(btn => {
+            btn.setAttribute('aria-pressed', btn.dataset.viewBtn === view ? 'true' : 'false');
+        });
+        this.updateLayoutButton();
+        if (rerender) this.renderBoard();
+    }
+
+    goToLane(id) {
+        document.body.classList.remove('rail-open');
+        const el = document.getElementById(`lane-${id}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: this.currentView === 'columns' ? 'nearest' : 'start', inline: 'center' });
     }
 
     // Column Layout Management
@@ -267,22 +243,12 @@ class FreeKanban {
 
     updateLayoutButton() {
         const button = document.getElementById('layout-button');
-        const layoutDisplay = {
-            3: '3⚏',    // 3 with grid icon
-            4: '4⚏',    // 4 with grid icon  
-            5: '5⚏'     // 5 with grid icon
-        };
-        
-        const layoutNames = {
-            3: '3 Columns',
-            4: '4 Columns',
-            5: '5 Columns'
-        };
-        
-        if (button) {
-            button.textContent = layoutDisplay[this.currentColumnLayout];
-            button.title = `Current: ${layoutNames[this.currentColumnLayout]} - Click to change`;
-        }
+        if (!button) return;
+        const cols = this.currentView === 'columns';
+        const names = cols ? { 3: '3 across', 4: '4 across', 5: '5 across' } : { 3: 'Wide', 4: 'Medium', 5: 'Narrow' };
+        button.querySelector('.g').textContent = cols ? 'Columns shown' : 'Card size';
+        button.querySelector('.v').textContent = names[this.currentColumnLayout];
+        button.title = `Current: ${names[this.currentColumnLayout]} - Click to change`;
     }
 
     // Column Movement
@@ -301,7 +267,7 @@ class FreeKanban {
             
             this.saveColumnsToStorage();
             this.renderBoard();
-            this.showToast('Column moved left', 'success');
+            this.showToast(`Stage moved ${this.currentView === 'columns' ? 'left' : 'up'}`, 'success');
         }
     }
 
@@ -320,7 +286,7 @@ class FreeKanban {
             
             this.saveColumnsToStorage();
             this.renderBoard();
-            this.showToast('Column moved right', 'success');
+            this.showToast(`Stage moved ${this.currentView === 'columns' ? 'right' : 'down'}`, 'success');
         }
     }
 
@@ -540,6 +506,7 @@ class FreeKanban {
     }
 
     saveBoardsToStorage() {
+        setTimeout(() => this.renderRail(), 0);
         localStorage.setItem('kanban-saved-boards', JSON.stringify(this.savedBoards));
     }
 
@@ -602,13 +569,13 @@ class FreeKanban {
             modal.innerHTML = `
                 <div class="modal-content modal-compact">
                     <div class="modal-header">
-                        <h2 class="modal-title">My Boards</h2>
+                        <h2 class="modal-title">Manage boards</h2>
                         <button class="modal-close" onclick="kanban.closeBoardManager()">×</button>
                     </div>
                     <div class="board-manager-compact">
                         <div class="board-actions-row">
-                            <button class="btn btn-sm" onclick="kanban.createNewBoard()">➕ New Board</button>
-                            <button class="btn btn-sm btn-secondary" onclick="kanban.duplicateCurrentBoard()">📑 Duplicate</button>
+                            <button class="btn btn-sm" onclick="kanban.createNewBoard()">New board</button>
+                            <button class="btn btn-sm btn-secondary" onclick="kanban.duplicateCurrentBoard()">Duplicate board</button>
                         </div>
                         
                         <div class="boards-list-compact">
@@ -632,7 +599,7 @@ class FreeKanban {
                         </div>
                         
                         <div class="board-manager-footer">
-                            <small class="footer-note">💡 Auto-saves every 5 minutes</small>
+                            <small class="footer-note">Boards auto-save every 5 minutes</small>
                         </div>
                     </div>
                 </div>
@@ -702,7 +669,7 @@ class FreeKanban {
                     </div>
                     <div class="board-item-right">
                         <span class="board-stats">${taskCount}T/${columnCount}C</span>
-                        <button class="btn-compact" onclick="kanban.switchToBoard('${boardId}')" title="Load">📂</button>
+                        <button class="btn-compact" onclick="kanban.switchToBoard('${boardId}')" title="Open">Open</button>
                         <button class="btn-compact btn-danger" onclick="kanban.deleteBoard('${boardId}')" title="Delete">×</button>
                     </div>
                 </div>
@@ -864,15 +831,15 @@ class FreeKanban {
             modal.innerHTML = `
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2 class="modal-title" id="column-modal-title">New Column</h2>
+                        <h2 class="modal-title" id="column-modal-title">New stage</h2>
                     </div>
                     <form id="column-form" onsubmit="kanban.saveColumn(event)">
                         <div class="form-group">
-                            <label class="form-label" for="column-title">Column Title</label>
-                            <input type="text" class="form-input" id="column-title" required maxlength="50" placeholder="e.g., In Review">
+                            <label class="form-label" for="column-title">Stage name</label>
+                            <input type="text" class="form-input" id="column-title" required maxlength="50" placeholder="e.g., In review">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Column Color</label>
+                            <label class="form-label">Color</label>
                             <div class="color-picker-container">
                                 <button type="button" class="color-option" data-color="" title="Default (no color)" onclick="kanban.selectColumnColor('')">
                                     <span class="color-circle no-color">✕</span>
@@ -909,7 +876,7 @@ class FreeKanban {
                         </div>
                         <div class="modal-actions">
                             <button type="button" class="btn btn-secondary" onclick="kanban.closeColumnModal()">Cancel</button>
-                            <button type="submit" class="btn">Save Column</button>
+                            <button type="submit" class="btn">Save stage</button>
                         </div>
                     </form>
                 </div>
@@ -924,14 +891,14 @@ class FreeKanban {
         if (columnId) {
             const column = this.columns.find(c => c.id === columnId);
             if (column) {
-                title.textContent = 'Edit Column';
+                title.textContent = 'Edit stage';
                 document.getElementById('column-title').value = column.title;
                 const color = column.color || '';
                 document.getElementById('column-color').value = color;
                 this.updateColumnColorPickerSelection(color);
             }
         } else {
-            title.textContent = 'New Column';
+            title.textContent = 'New stage';
             form.reset();
             document.getElementById('column-color').value = '';
             this.updateColumnColorPickerSelection('');
@@ -976,7 +943,7 @@ class FreeKanban {
         this.saveColumnsToStorage();
         this.renderBoard();
         this.closeColumnModal();
-        this.showToast(this.currentColumnId ? 'Column updated' : 'Column created', 'success');
+        this.showToast(this.currentColumnId ? 'Stage updated' : 'Stage created', 'success');
     }
 
     editColumn(columnId) {
@@ -986,7 +953,7 @@ class FreeKanban {
     deleteColumn(columnId) {
         // Don't allow deleting if it's the only column
         if (this.columns.length <= 1) {
-            this.showToast('Cannot delete the last column', 'error');
+            this.showToast('Cannot delete the last stage', 'error');
             return;
         }
 
@@ -995,12 +962,12 @@ class FreeKanban {
 
         const tasksInColumn = this.tasks.filter(t => t.column === columnId);
         
-        let confirmMessage = `Are you sure you want to delete the "${column.title}" column?`;
+        let confirmMessage = `Are you sure you want to delete the "${column.title}" stage?`;
         if (tasksInColumn.length > 0) {
-            confirmMessage += `\n\nThis column contains ${tasksInColumn.length} task(s). They will be moved to the first column.`;
+            confirmMessage += `\n\nThis stage contains ${tasksInColumn.length} task(s). They will be moved to the first stage.`;
         }
 
-        this.showConfirmDialog('Delete Column', confirmMessage, (confirmed) => {
+        this.showConfirmDialog('Delete stage', confirmMessage, (confirmed) => {
             if (confirmed) {
                 // Move tasks to the first column
                 if (tasksInColumn.length > 0) {
@@ -1021,7 +988,7 @@ class FreeKanban {
                 this.saveColumnsToStorage();
                 this.saveToStorage();
                 this.renderBoard();
-                this.showToast('Column deleted', 'info');
+                this.showToast('Stage deleted', 'info');
             }
         });
     }
@@ -1194,7 +1161,7 @@ class FreeKanban {
 
                 this.showChoiceDialog(
                     'Import Board',
-                    `Import "${importedBoardName}"?\n\nFound ${importedTasks.length} tasks and ${importedColumns.length} columns.\n\nWhat would you like to do?`,
+                    `Import "${importedBoardName}"?\n\nFound ${importedTasks.length} tasks and ${importedColumns.length} stages.\n\nWhat would you like to do?`,
                     options,
                     (choice) => {
 
@@ -1398,6 +1365,7 @@ class FreeKanban {
             if (index !== -1) {
                 // Preserve the column if editing
                 taskData.column = this.tasks[index].column;
+                if (this.tasks[index].order !== undefined) taskData.order = this.tasks[index].order;
                 this.tasks[index] = taskData;
             }
         } else {
@@ -1423,17 +1391,43 @@ class FreeKanban {
         });
     }
 
-    moveTask(taskId, newColumn) {
+    // Order of tasks inside one stage: manual order (set by dragging) wins;
+    // tasks that were never placed manually (e.g. new ones) sit on top, by priority then newest.
+    compareTasks(a, b) {
+        const aSet = a.order !== undefined, bSet = b.order !== undefined;
+        if (aSet && bSet && a.order !== b.order) return a.order - b.order;
+        if (aSet !== bSet) return aSet ? 1 : -1;
+        const rank = { high: 0, medium: 1, low: 2 };
+        return (rank[a.priority] - rank[b.priority]) || (new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    sortedTasksInColumn(columnId) {
+        return this.tasks.filter(t => t.column === columnId).sort((a, b) => this.compareTasks(a, b));
+    }
+
+    moveTask(taskId, newColumn, beforeTaskId = null) {
         const task = this.tasks.find(t => t.id === taskId);
-        if (task && task.column !== newColumn) {
-            const oldColumn = task.column;
+        if (!task) return false;
+        const oldColumn = task.column;
+        const changedColumn = oldColumn !== newColumn;
+
+        // Work out the new sequence of the target stage
+        const currentSeq = this.sortedTasksInColumn(newColumn);
+        const seq = currentSeq.filter(t => t.id !== taskId);
+        let index = beforeTaskId ? seq.findIndex(t => t.id === beforeTaskId) : -1;
+        if (index < 0) index = seq.length;
+        seq.splice(index, 0, task);
+
+        if (!changedColumn && seq.every((t, i) => t.id === currentSeq[i].id)) return false; // dropped where it already was
+
+        if (changedColumn) {
             task.column = newColumn;
             task.updatedAt = new Date().toISOString();
-            
+
             // Auto-update progress based on column name patterns
             const newColumnTitle = this.columns.find(c => c.id === newColumn)?.title.toLowerCase() || '';
             const oldColumnTitle = this.columns.find(c => c.id === oldColumn)?.title.toLowerCase() || '';
-            
+
             // If moving to a "done" column, complete the task
             if ((newColumnTitle.includes('done') || newColumnTitle.includes('complete')) && task.progress < 100) {
                 task.progress = 100;
@@ -1446,11 +1440,14 @@ class FreeKanban {
             else if ((newColumnTitle.includes('progress') || newColumnTitle.includes('doing')) && task.progress === 0) {
                 task.progress = 25;
             }
-            
-            this.renderBoard();
-            this.saveToStorage();
-            this.showToast(`Task moved to ${this.columns.find(c => c.id === newColumn)?.title}`, 'success');
         }
+
+        seq.forEach((t, i) => { t.order = i; });
+
+        this.renderBoard();
+        this.saveToStorage();
+        this.showToast(changedColumn ? `Task moved to ${this.columns.find(c => c.id === newColumn)?.title}` : 'Task reordered', 'success');
+        return true;
     }
 
     // Search
@@ -1511,161 +1508,463 @@ class FreeKanban {
     renderBoard() {
         const boardContainer = document.querySelector('.board');
         if (!boardContainer) return;
-        
-        // Clear existing content
-        boardContainer.innerHTML = '';
-        
-        // Sort columns by order
-        const sortedColumns = [...this.columns].sort((a, b) => a.order - b.order);
-        
-        // Render each column
-        sortedColumns.forEach((column, index) => {
-            const tasks = this.tasks.filter(t => t.column === column.id);
-            const canMoveLeft = index > 0;
-            const canMoveRight = index < sortedColumns.length - 1;
-            
-            const columnElement = document.createElement('div');
-            columnElement.className = 'column';
-            columnElement.setAttribute('data-column', column.id);
-            if (column.color) {
-                columnElement.style.background = `linear-gradient(${column.color}2e, ${column.color}2e), var(--bg-card)`;
-                columnElement.style.borderColor = `${column.color}80`;
-            }
-            
-            columnElement.innerHTML = `
-                <div class="column-header">
-                    <div class="column-title">${column.color ? `<span class="column-color-dot" style="background: ${column.color}"></span>` : ''}${this.escapeHtml(column.title)}</div>
-                    <div class="column-menu-container">
-                        <button class="btn btn-secondary btn-icon column-menu-btn" onclick="kanban.toggleColumnMenu('${column.id}')" title="Column Options">⋯</button>
-                        <div class="column-menu" id="menu-${column.id}">
-                            <button class="column-menu-item" onclick="kanban.moveColumnLeft('${column.id}'); kanban.closeColumnMenus();" ${!canMoveLeft ? 'disabled' : ''}>
-                                <span class="menu-icon">←</span> Move Left
-                            </button>
-                            <button class="column-menu-item" onclick="kanban.moveColumnRight('${column.id}'); kanban.closeColumnMenus();" ${!canMoveRight ? 'disabled' : ''}>
-                                <span class="menu-icon">→</span> Move Right
-                            </button>
-                            <button class="column-menu-item" onclick="kanban.editColumn('${column.id}'); kanban.closeColumnMenus();">
-                                <span class="menu-icon">✎</span> Edit
-                            </button>
-                            <button class="column-menu-item danger" onclick="kanban.deleteColumn('${column.id}'); kanban.closeColumnMenus();">
-                                <span class="menu-icon">×</span> Delete
-                            </button>
+        // Keep each stage's horizontal scroll position across re-renders (no jump after a drop)
+        const scrolls = {};
+        boardContainer.querySelectorAll('.column').forEach(col => {
+            const z = col.querySelector('.tasks-container');
+            if (z && z.scrollLeft) scrolls[col.dataset.column] = z.scrollLeft;
+        });
+        const sorted = [...this.columns].sort((a, b) => a.order - b.order);
+        const horiz = this.currentView === 'columns';
+        const lanes = sorted.map((column, i) => {
+            const id = column.id;
+            const tasks = this.sortedTasksInColumn(id);
+            return `
+            <section class="column lane" id="lane-${id}" data-column="${id}" style="--c:${column.color || '#8A96AB'}">
+                <div class="lane-head">
+                    <div class="lane-top">
+                        <span class="lane-dot"></span>
+                        <h2 class="column-title">${this.escapeHtml(column.title)}</h2>
+                        <div class="column-menu-container">
+                            <button class="btn-icon column-menu-btn" onclick="kanban.toggleColumnMenu('${id}')" title="Stage options" aria-label="Stage options">⋯</button>
+                            <div class="column-menu" id="menu-${id}">
+                                <button class="column-menu-item" onclick="kanban.moveColumnLeft('${id}'); kanban.closeColumnMenus();" ${i === 0 ? 'disabled' : ''}>${horiz ? '← Move left' : '↑ Move up'}</button>
+                                <button class="column-menu-item" onclick="kanban.moveColumnRight('${id}'); kanban.closeColumnMenus();" ${i === sorted.length - 1 ? 'disabled' : ''}>${horiz ? '→ Move right' : '↓ Move down'}</button>
+                                <button class="column-menu-item" onclick="kanban.editColumn('${id}'); kanban.closeColumnMenus();">Rename or recolor</button>
+                                <button class="column-menu-item danger" onclick="kanban.deleteColumn('${id}'); kanban.closeColumnMenus();">Delete stage</button>
+                            </div>
                         </div>
                     </div>
+                    <span class="lane-count">${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}</span>
+                    <button class="lane-add" onclick="kanban.openTaskModal('${id}')">Add task</button>
                 </div>
-                <div class="tasks-container" ondrop="kanban.drop(event)" ondragover="kanban.allowDrop(event)">
-                    ${tasks
-                        .sort((a, b) => {
-                            // Sort by priority first, then by creation date
-                            const priorityOrder = { high: 0, medium: 1, low: 2 };
-                            if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
-                                return priorityOrder[a.priority] - priorityOrder[b.priority];
-                            }
-                            return new Date(b.createdAt) - new Date(a.createdAt);
-                        })
-                        .map(task => this.renderTaskCard(task))
-                        .join('')}
-                    <button class="add-task-btn" onclick="kanban.openTaskModal('${column.id}')">
-                        + Add task
-                    </button>
+                <div class="tasks-container">
+                    ${tasks.length ? tasks.map(t => this.renderTaskCard(t)).join('') : '<span class="empty">No tasks yet. Drop one here.</span>'}
                 </div>
-            `;
-            
-            boardContainer.appendChild(columnElement);
+            </section>`;
+        }).join('');
+        boardContainer.innerHTML = lanes + `
+            <div class="add-lane"><button class="add-column-btn" onclick="kanban.openColumnModal()">Add a stage</button></div>`;
+
+        boardContainer.querySelectorAll('.column').forEach(col => {
+            const z = col.querySelector('.tasks-container');
+            if (z && scrolls[col.dataset.column]) z.scrollLeft = scrolls[col.dataset.column];
         });
-        
-        // Add "Add Column" button at the end
-        const addColumnElement = document.createElement('div');
-        addColumnElement.className = 'column add-column-container';
-        addColumnElement.innerHTML = `
-            <button class="add-column-btn" onclick="kanban.openColumnModal()">
-                + Add Column
-            </button>
-        `;
-        boardContainer.appendChild(addColumnElement);
-        
-        // Reinitialize touch support for new cards
-        if ('ontouchstart' in window) {
-            this.initializeTouchSupport();
-        }
+
+        this.renderRail();
+        if (this.searchTerm) this.filterTasks();
+    }
+
+    renderRail() {
+        const boards = document.getElementById('rail-boards');
+        const lanes = document.getElementById('rail-lanes');
+        if (!boards || !lanes) return;
+        boards.innerHTML = Object.keys(this.savedBoards).map(id => {
+            const b = this.savedBoards[id];
+            const cur = id === this.currentBoardId;
+            const name = this.escapeHtml(cur ? this.currentBoardName : b.name);
+            const n = cur ? this.tasks.length : (b.tasks || []).length;
+            return `<button class="rail-item${cur ? ' on' : ''}" ${cur ? '' : `onclick="kanban.switchToBoard('${id}')"`}><span class="g">${name}</span><em>${n}</em></button>`;
+        }).join('');
+        const sorted = [...this.columns].sort((a, b) => a.order - b.order);
+        lanes.innerHTML = sorted.map(c => {
+            const n = this.tasks.filter(t => t.column === c.id).length;
+            return `<button class="rail-item" onclick="kanban.goToLane('${c.id}')"><span class="d" style="--c:${c.color || '#8A96AB'}"></span><span class="g">${this.escapeHtml(c.title)}</span><em>${n}</em></button>`;
+        }).join('');
+        const done = this.tasks.filter(t => t.progress >= 100).length;
+        const summary = document.getElementById('summary');
+        if (summary) summary.textContent = `${this.tasks.length} tasks, ${done} finished`;
     }
 
     renderTaskCard(task) {
         const color = (task.color === undefined || task.color === null) ? '#3b82f6' : task.color;
-        const colorStyle = color ? `border-left: 4px solid ${color}; background: linear-gradient(90deg, ${color}15 0%, transparent 40%);` : '';
+        const prio = { high: 'High', medium: 'Med', low: 'Low' }[task.priority] || task.priority;
+        const pips = [1, 2, 3, 4, 5].map(n => `<i class="${n <= task.difficulty ? 'f' : ''}"></i>`).join('');
         return `
-            <div class="task-card" draggable="true" data-task-id="${task.id}" 
-                 style="${colorStyle}"
-                 ondragstart="kanban.drag(event)" ondragend="kanban.dragEnd(event)">
-                <div class="task-header">
-                    <div class="task-title">${this.escapeHtml(task.title)}</div>
-                    <div class="task-actions">
-                        <button class="task-action-btn" onclick="kanban.openTaskModal('${task.column}', '${task.id}')" title="Edit">✎</button>
-                        <button class="task-action-btn" onclick="kanban.deleteTask('${task.id}')" title="Delete">×</button>
-                    </div>
+            <article class="task-card${color ? ' colored' : ''}" data-task-id="${task.id}" ${color ? `style="--tc:${color}"` : ''}>
+                <div class="t-main">
+                    <h3 class="task-title">${this.escapeHtml(task.title)}</h3>
+                    ${task.description ? `<p class="task-description">${this.escapeHtml(task.description)}</p>` : ''}
                 </div>
-                
-                ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
-                
-                <div class="task-metrics">
-                    <div class="metric-item">
-                        <span class="metric-label">Difficulty</span>
-                        <span class="metric-value">${task.difficulty}/5</span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="metric-label">Priority</span>
-                        <span class="priority-badge priority-${task.priority}">${task.priority === 'medium' ? 'MED' : task.priority.toUpperCase()}</span>
-                    </div>
+                <div class="t-side">
+                    <span class="t-pct">${task.progress}%</span>
+                    <span class="t-actions">
+                        <button onclick="kanban.openTaskModal('${task.column}', '${task.id}')" title="Edit" aria-label="Edit task">✎</button>
+                        <button onclick="kanban.deleteTask('${task.id}')" title="Delete" aria-label="Delete task">×</button>
+                    </span>
                 </div>
-                
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${task.progress}%"></div>
+                <div class="t-meta">
+                    <span class="m-item m-diff"><span class="lbl">Difficulty</span><span class="pips" title="${task.difficulty} of 5">${pips}</span></span>
+                    <span class="m-item m-prio"><span class="lbl">Priority</span><span class="prio prio-${task.priority}">${prio}</span></span>
                 </div>
-                
-                <div class="task-dense-info">
-                    <span class="priority-badge priority-${task.priority}">${task.priority.substr(0,1).toUpperCase()}</span>
-                    <span class="progress-indicator">${task.progress}%</span>
-                </div>
-            </div>
-        `;
+                <div class="t-progress" title="Progress"><span class="track"><i style="width:${task.progress}%"></i></span><span>${task.progress}%</span></div>
+            </article>`;
     }
 
-    // Drag and Drop
-    drag(event) {
-        this.draggedElement = event.target;
-        event.target.classList.add('dragging');
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/html', event.target.innerHTML);
+    // ───────────────────────── Drag and Drop ─────────────────────────
+    // Native HTML5 drag-and-drop can't be animated (the browser paints its own ghost and the
+    // drop is instant), so this is pointer based:
+    //   1. the pressed card is lifted into a floating clone that follows the pointer
+    //   2. the original stays in the list as a dashed "slot" and is moved around live
+    //   3. every other card (and lane) glides to its new spot with FLIP animations
+    //   4. on release the clone flies into the slot, then the real data update happens
+    // Works the same for mouse, pen and touch (touch = press and hold to pick up).
+
+    initializeDragAndDrop() {
+        this.dragEase = 'cubic-bezier(.2, .8, .2, 1)';
+        this._onMove = (e) => this.onPointerMove(e);
+        this._onUp = (e) => this.onPointerUp(e);
+        this._onCancel = () => this.abortDrag();
+        this._onKey = (e) => {
+            if (e.key === 'Escape' && this.drag && this.drag.active) { e.preventDefault(); this.abortDrag(); }
+        };
+
+        const board = document.querySelector('.board');
+        if (!board) return;
+        board.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+        board.addEventListener('contextmenu', (e) => {
+            if (this.drag && this.drag.type === 'touch') e.preventDefault(); // long-press menu
+        });
+        // Once a touch drag is running, keep the page from scrolling under the finger
+        document.addEventListener('touchmove', (e) => {
+            if (this.drag && this.drag.active) e.preventDefault();
+        }, { passive: false });
     }
 
-    dragEnd(event) {
-        event.target.classList.remove('dragging');
+    reduceMotion() {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
-    allowDrop(event) {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        
-        const dropZone = event.target.closest('.tasks-container');
-        if (dropZone) {
-            dropZone.classList.add('drag-over');
+    onPointerDown(e) {
+        if (this.drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+        const card = e.target.closest('.task-card');
+        if (!card || e.target.closest('button, a, input, textarea, select')) return;
+
+        this.drag = {
+            card, type: e.pointerType, id: e.pointerId,
+            x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY,
+            active: false, ending: false, dirty: false, timer: null
+        };
+        // Touch: hold briefly to pick up, so a normal swipe still scrolls the board
+        if (e.pointerType === 'touch') this.drag.timer = setTimeout(() => this.beginDrag(), 220);
+
+        window.addEventListener('pointermove', this._onMove);
+        window.addEventListener('pointerup', this._onUp);
+        window.addEventListener('pointercancel', this._onCancel);
+        window.addEventListener('keydown', this._onKey);
+        window.addEventListener('blur', this._onCancel);
+    }
+
+    onPointerMove(e) {
+        const d = this.drag;
+        if (!d || e.pointerId !== d.id) return;
+        d.x = e.clientX; d.y = e.clientY; d.dirty = true;
+        if (d.active) return;
+
+        const moved = Math.hypot(d.x - d.startX, d.y - d.startY);
+        if (d.type === 'touch') {
+            if (moved > 8) this.abortDrag(); // finger is scrolling, not dragging
+        } else if (moved > 4) {
+            this.beginDrag();
         }
     }
 
-    drop(event) {
-        event.preventDefault();
-        const dropZone = event.target.closest('.tasks-container');
-        
-        if (dropZone) {
-            dropZone.classList.remove('drag-over');
-            
-            const column = dropZone.closest('.column').dataset.column;
-            const taskId = this.draggedElement.dataset.taskId;
-            
-            if (taskId && column) {
-                this.moveTask(taskId, column);
+    onPointerUp(e) {
+        const d = this.drag;
+        if (!d || e.pointerId !== d.id) return;
+        if (!d.active) { this.abortDrag(); return; } // it was just a click
+        this.endDrag();
+    }
+
+    teardownDragListeners() {
+        window.removeEventListener('pointermove', this._onMove);
+        window.removeEventListener('pointerup', this._onUp);
+        window.removeEventListener('pointercancel', this._onCancel);
+        window.removeEventListener('keydown', this._onKey);
+        window.removeEventListener('blur', this._onCancel);
+        if (this.drag) clearTimeout(this.drag.timer);
+    }
+
+    beginDrag() {
+        const d = this.drag;
+        if (!d || d.active) return;
+        clearTimeout(d.timer);
+
+        const card = d.card;
+        const rect = card.getBoundingClientRect();
+        d.active = true;
+        d.dirty = true;
+        d.offX = d.startX - rect.left;
+        d.offY = d.startY - rect.top;
+        d.origin = { parent: card.parentNode, next: card.nextElementSibling };
+        d.zone = card.parentNode;
+
+        // Floating clone that follows the pointer
+        const ghost = card.cloneNode(true);
+        ghost.removeAttribute('data-task-id');
+        ghost.setAttribute('aria-hidden', 'true');
+        ghost.classList.add('drag-ghost');
+        ghost.style.width = rect.width + 'px';
+        ghost.style.height = rect.height + 'px';
+        ghost.style.translate = `${rect.left}px ${rect.top}px`;
+        document.body.appendChild(ghost);
+        ghost.getBoundingClientRect();      // commit the start state so the lift is a transition
+        ghost.classList.add('lifted');
+        d.ghost = ghost;
+
+        // The original becomes the slot that shows where the card will land
+        card.classList.add('is-placeholder');
+        d.zone.classList.add('drag-over');
+        document.body.classList.add('is-dragging');
+        if (d.type === 'touch' && navigator.vibrate) navigator.vibrate(8);
+
+        this.dragFrame();
+    }
+
+    // One frame of the drag: move the ghost, auto-scroll near edges, re-project the slot
+    dragFrame() {
+        const d = this.drag;
+        if (!d || !d.active || d.ending) return;
+
+        d.ghost.style.translate = `${d.x - d.offX}px ${d.y - d.offY}px`;
+
+        let scrolled = false;
+        const edge = 80, speed = 16;
+
+        // Page scroll (top and bottom edges of the viewport)
+        const vy = d.y < edge ? -(1 - Math.max(d.y, 0) / edge)
+            : d.y > window.innerHeight - edge ? 1 - Math.max(window.innerHeight - d.y, 0) / edge : 0;
+        if (vy) {
+            const before = window.scrollY;
+            window.scrollBy(0, vy * speed);
+            if (window.scrollY !== before) scrolled = true;
+        }
+
+        // Horizontal scroll inside the stage under the pointer (lanes layout)
+        const zone = d.zone;
+        if (zone && zone.scrollWidth > zone.clientWidth) {
+            const zr = zone.getBoundingClientRect();
+            if (d.y >= zr.top && d.y <= zr.bottom) {
+                const fromLeft = d.x - zr.left, fromRight = zr.right - d.x;
+                const hx = fromLeft < edge ? -(1 - Math.max(fromLeft, 0) / edge)
+                    : fromRight < edge ? 1 - Math.max(fromRight, 0) / edge : 0;
+                if (hx) {
+                    const before = zone.scrollLeft;
+                    zone.scrollLeft += hx * speed;
+                    if (zone.scrollLeft !== before) scrolled = true;
+                }
             }
         }
+
+        if (d.dirty || scrolled) {
+            d.dirty = false;
+            this.updatePlacement();
+        }
+        d.raf = requestAnimationFrame(() => this.dragFrame());
+    }
+
+    // Next visible task card after an element (null = it is last)
+    nextVisibleCard(el) {
+        let n = el.nextElementSibling;
+        while (n && !(n.classList.contains('task-card') && n.offsetParent !== null)) n = n.nextElementSibling;
+        return n;
+    }
+
+    // The card the dragged task should be inserted before (null = end of stage).
+    // Uses layout positions (offset*), not on-screen rects, so cards that are still
+    // mid-animation don't make the decision flicker.
+    getDropReference(zone, x, y) {
+        const vertical = getComputedStyle(zone).flexDirection === 'column';
+        const zr = zone.getBoundingClientRect();
+        const cards = [...zone.querySelectorAll(':scope > .task-card')]
+            .filter(c => !c.classList.contains('is-placeholder') && c.offsetParent !== null);
+        for (const c of cards) {
+            const mid = vertical
+                ? zr.top - zone.scrollTop + c.offsetTop + c.offsetHeight / 2
+                : zr.left - zone.scrollLeft + c.offsetLeft + c.offsetWidth / 2;
+            if ((vertical ? y : x) < mid) return c;
+        }
+        return null;
+    }
+
+    updatePlacement() {
+        const d = this.drag;
+        const under = document.elementFromPoint(d.x, d.y);
+        const col = under && under.closest('.column');
+        // Pointer over a gap or the header: keep the last stage instead of jumping around
+        const zone = (col && col.querySelector('.tasks-container')) || d.zone;
+        const ph = d.card;
+        const ref = this.getDropReference(zone, d.x, d.y);
+
+        if (ph.parentNode === zone && this.nextVisibleCard(ph) === ref) return; // already projected here
+
+        this.flipMove(() => zone.insertBefore(ph, ref), ph);
+        this.setDragOver(zone);
+    }
+
+    setDragOver(zone) {
+        if (this.drag) this.drag.zone = zone;
+        document.querySelectorAll('.tasks-container.drag-over').forEach(z => { if (z !== zone) z.classList.remove('drag-over'); });
+        zone.classList.add('drag-over');
+    }
+
+    // FLIP: record where everything is, change the DOM, then animate each thing from
+    // its old on-screen position to its new one. Stages (lanes) animate their height too,
+    // so nothing snaps when a card leaves or enters.
+    flipMove(mutate, ph) {
+        const board = document.querySelector('.board');
+        const boxes = [...board.children];
+        const cards = [...board.querySelectorAll('.task-card')].filter(c => c.offsetParent !== null);
+        const colOf = (c) => c.closest('.column');
+
+        const firstBox = new Map(boxes.map(b => [b, b.getBoundingClientRect()]));
+        const firstCard = new Map(cards.map(c => [c, c.getBoundingClientRect()]));
+        const colBefore = new Map(cards.map(c => [c, colOf(c)]));
+
+        [...boxes, ...cards].forEach(el => el.getAnimations().forEach(a => a.cancel()));
+        mutate();
+        if (this.reduceMotion()) return;
+
+        // Measure everything first, animate afterwards (animations would skew later reads)
+        const lastBox = new Map(boxes.map(b => [b, b.getBoundingClientRect()]));
+        const lastCard = new Map(cards.map(c => [c, c.getBoundingClientRect()]));
+        const colAfter = new Map(cards.map(c => [c, colOf(c)]));
+        const opts = { duration: 240, easing: this.dragEase };
+
+        boxes.forEach(b => {
+            const f = firstBox.get(b), l = lastBox.get(b);
+            const dx = f.left - l.left, dy = f.top - l.top, dh = f.height - l.height;
+            if (Math.abs(dx) < .5 && Math.abs(dy) < .5 && Math.abs(dh) < .5) return;
+            const from = { transform: `translate(${dx}px, ${dy}px)` };
+            const to = { transform: 'none' };
+            if (Math.abs(dh) >= .5) {
+                Object.assign(from, { height: f.height + 'px', overflow: 'hidden', alignContent: 'start' });
+                Object.assign(to, { height: l.height + 'px', overflow: 'hidden', alignContent: 'start' });
+            }
+            b.animate([from, to], opts);
+        });
+
+        cards.forEach(c => {
+            if (c === ph && colBefore.get(c) !== colAfter.get(c)) {
+                // Slot appears in a different stage: fade/scale in rather than fly across the board
+                c.animate([{ opacity: 0, transform: 'scale(.92)' }, { opacity: 1, transform: 'none' }], opts);
+                return;
+            }
+            // Movement relative to the stage, because the stage itself is animated above
+            const f = firstCard.get(c), l = lastCard.get(c);
+            const fb = firstBox.get(colBefore.get(c)) || { left: 0, top: 0 };
+            const lb = lastBox.get(colAfter.get(c)) || { left: 0, top: 0 };
+            const dx = (f.left - fb.left) - (l.left - lb.left);
+            const dy = (f.top - fb.top) - (l.top - lb.top);
+            if (Math.abs(dx) < .5 && Math.abs(dy) < .5) return;
+            c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], opts);
+        });
+    }
+
+    // Final on-screen position of an element from layout only (ignores in-flight transforms)
+    layoutPos(el) {
+        let x = 0, y = 0;
+        for (let n = el; n; n = n.offsetParent) {
+            x += n.offsetLeft; y += n.offsetTop;
+            const p = n.offsetParent;
+            if (p) { x += p.clientLeft - p.scrollLeft; y += p.clientTop - p.scrollTop; }
+        }
+        return { x: x - window.scrollX, y: y - window.scrollY };
+    }
+
+    // Fly the ghost into the slot, then call done()
+    landGhost(done) {
+        const d = this.drag, g = d.ghost;
+        if (this.reduceMotion()) { done(); return; }
+        const t = this.layoutPos(d.card);
+        g.classList.remove('lifted');
+        g.classList.add('landing');
+        g.style.translate = `${t.x}px ${t.y}px`;
+
+        let finished = false;
+        const end = () => {
+            if (finished) return;
+            finished = true;
+            g.removeEventListener('transitionend', onEnd);
+            done();
+        };
+        const onEnd = (e) => { if (e.target === g && e.propertyName === 'translate') end(); };
+        g.addEventListener('transitionend', onEnd);
+        setTimeout(end, 400); // safety net if transitionend never fires
+    }
+
+    endDrag() {
+        const d = this.drag;
+        d.ending = true;
+        cancelAnimationFrame(d.raf);
+        this.teardownDragListeners();
+
+        this.landGhost(() => {
+            const ph = d.card;
+            const zone = ph.parentNode;
+            const column = zone.closest('.column').dataset.column;
+            let next = ph.nextElementSibling;
+            while (next && !next.classList.contains('task-card')) next = next.nextElementSibling;
+
+            this.holdScrollSnap();
+            document.body.classList.remove('is-dragging');
+            document.querySelectorAll('.tasks-container.drag-over').forEach(z => z.classList.remove('drag-over'));
+
+            // moveTask re-renders the board; the ghost is exactly over the new card, so
+            // removing it in the same frame is seamless
+            const taskId = ph.dataset.taskId;
+            const changed = this.moveTask(taskId, column, next ? next.dataset.taskId : null);
+            if (changed) {
+                const el = document.querySelector(`.task-card[data-task-id="${CSS.escape(taskId)}"]`);
+                if (el) {
+                    el.classList.add('just-dropped');
+                    el.addEventListener('animationend', () => el.classList.remove('just-dropped'), { once: true });
+                }
+            } else {
+                ph.classList.remove('is-placeholder');
+            }
+            d.ghost.remove();
+            this.drag = null;
+        });
+    }
+
+    // Scroll-snap would nudge a lane sideways the moment a drag ends (a small visible jump),
+    // so it stays off until the person scrolls again.
+    holdScrollSnap() {
+        document.body.classList.add('snap-off');
+        if (this._snapRelease) return;
+        const events = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+        this._snapRelease = () => {
+            if (this.drag) return;
+            document.body.classList.remove('snap-off');
+            events.forEach(t => window.removeEventListener(t, this._snapRelease));
+            this._snapRelease = null;
+        };
+        events.forEach(t => window.addEventListener(t, this._snapRelease, { passive: true }));
+    }
+
+    // Escape, window blur or pointercancel: put the card back where it started
+    abortDrag() {
+        const d = this.drag;
+        if (!d) return;
+        this.teardownDragListeners();
+        if (!d.active) { this.drag = null; return; }
+
+        d.ending = true;
+        cancelAnimationFrame(d.raf);
+        const ph = d.card, { parent, next } = d.origin;
+        if (ph.parentNode !== parent || ph.nextElementSibling !== next) {
+            this.flipMove(() => parent.insertBefore(ph, next), ph);
+            this.setDragOver(parent);
+        }
+        this.landGhost(() => {
+            this.holdScrollSnap();
+            document.body.classList.remove('is-dragging');
+            document.querySelectorAll('.tasks-container.drag-over').forEach(z => z.classList.remove('drag-over'));
+            ph.classList.remove('is-placeholder');
+            d.ghost.remove();
+            this.drag = null;
+        });
     }
 
     // Utilities
@@ -1869,4 +2168,4 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Initialize the application
-const kanban = new FreeKanban();
+const kanban = new EasyKanban();
