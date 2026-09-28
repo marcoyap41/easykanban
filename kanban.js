@@ -1536,7 +1536,7 @@ class EasyKanban {
                         </div>
                     </div>
                     <span class="lane-count">${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}</span>
-                    <button class="lane-add" onclick="kanban.openTaskModal('${id}')">Add task</button>
+                    <button class="lane-add" onclick="kanban.openTaskModal('${id}')">Add card</button>
                 </div>
                 <div class="tasks-container">
                     ${tasks.length ? tasks.map(t => this.renderTaskCard(t)).join('') : '<span class="empty">No tasks yet. Drop one here.</span>'}
