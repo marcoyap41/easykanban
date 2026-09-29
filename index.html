@@ -10,7 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body data-theme="black" data-view="columns">
+<body data-theme="black" data-view="columns" data-header="solid" data-glass-lanes="off" data-glass-cards="off">
+<div class="wallpaper" id="wallpaper" aria-hidden="true"></div>
 <div class="app">
     <aside class="rail" id="rail">
         <a href="index.html" class="brand"><i></i>EasyKanban</a>
@@ -28,9 +29,12 @@
             <button class="rail-item" id="theme-button" onclick="kanban.cycleTheme()"><span class="g">Theme</span><em class="v"></em></button>
             <button class="rail-item" id="density-button" onclick="kanban.cycleDensity()"><span class="g">Detail</span><em class="v"></em></button>
             <button class="rail-item" id="layout-button" onclick="kanban.cycleColumnLayout()"><span class="g">Card size</span><em class="v"></em></button>
+            <button class="rail-item" id="wallpaper-button" onclick="kanban.openWallpaperModal()"><span class="g">Wallpaper</span><em class="v"></em></button>
+            <button class="rail-item" id="autosave-button" onclick="kanban.toggleAutosave()"><span class="g">Autosave</span><em class="v"></em></button>
             <button class="rail-item" onclick="kanban.exportBoard()"><span class="g">Export board</span></button>
             <button class="rail-item" onclick="kanban.importBoard()"><span class="g">Import board</span></button>
         </section>
+        <footer class="rail-foot">Copyright © 2023 Marco Christian.</footer>
     </aside>
 
     <div class="stage">
@@ -105,6 +109,57 @@
                 <button type="submit" class="btn">Save task</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div id="wallpaper-modal" class="modal">
+    <div class="modal-content wp-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Wallpaper</h2>
+            <button type="button" class="modal-close" onclick="kanban.closeWallpaperModal()" aria-label="Close">×</button>
+        </div>
+        <p class="wp-hint" id="wp-hint"></p>
+        <div class="wp-frame" id="wp-frame">
+            <img id="wp-img" alt="" draggable="false">
+            <div class="wp-empty" id="wp-empty">No image yet.<br>Choose one to crop it to the board area.</div>
+        </div>
+        <div class="wp-zoom" id="wp-zoom-row">
+            <label for="wp-zoom">Zoom</label>
+            <input type="range" class="slider" id="wp-zoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
+        </div>
+        <label class="wp-toggle" for="header-blur-toggle">
+            <input type="checkbox" id="header-blur-toggle" onchange="kanban.setHeaderBlur(this.checked)">
+            <span><b>Blurry header bar</b><small>Semi-transparent with a frosted-glass blur</small></span>
+        </label>
+        <label class="wp-toggle" for="glass-lanes-toggle">
+            <input type="checkbox" id="glass-lanes-toggle" onchange="kanban.setGlass('lanes', this.checked)">
+            <span><b>Translucent stages</b><small>Lets the wallpaper show through the stage panels</small></span>
+        </label>
+        <label class="wp-toggle" for="glass-cards-toggle">
+            <input type="checkbox" id="glass-cards-toggle" onchange="kanban.setGlass('cards', this.checked)">
+            <span><b>Translucent cards</b><small>Lets the wallpaper show through task cards</small></span>
+        </label>
+        <div class="wp-zoom" id="glass-opacity-row">
+            <label for="glass-opacity">Opacity</label>
+            <input type="range" class="slider" id="glass-opacity" min="20" max="95" step="1" value="55" aria-label="Panel and card opacity" oninput="kanban.setGlassOpacity(this.value)">
+            <output id="glass-opacity-val">55%</output>
+        </div>
+        <div class="wp-zoom" id="header-blur-row">
+            <label for="header-blur-amount">Header blur</label>
+            <input type="range" class="slider" id="header-blur-amount" min="0" max="30" step="1" value="16" aria-label="Blur amount for the header bar" oninput="kanban.setGlassBlur('header', this.value)">
+            <output id="header-blur-val">16px</output>
+        </div>
+        <div class="wp-zoom" id="stage-blur-row">
+            <label for="stage-blur-amount">Stage blur</label>
+            <input type="range" class="slider" id="stage-blur-amount" min="0" max="30" step="1" value="10" aria-label="Blur amount for the stages" oninput="kanban.setGlassBlur('stage', this.value)">
+            <output id="stage-blur-val">10px</output>
+        </div>
+        <div class="modal-actions wp-actions">
+            <button type="button" class="btn btn-secondary wp-remove" id="wp-remove" onclick="kanban.removeWallpaper()">Remove</button>
+            <button type="button" class="btn btn-secondary" id="wp-choose" onclick="document.getElementById('wp-file').click()">Choose image</button>
+            <button type="button" class="btn" id="wp-apply" onclick="kanban.saveWallpaper()" disabled>Apply</button>
+        </div>
+        <input type="file" id="wp-file" accept="image/*" style="display:none" onchange="kanban.handleWallpaperFile(event)">
     </div>
 </div>
 

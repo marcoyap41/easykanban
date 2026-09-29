@@ -30,6 +30,7 @@ button{cursor:pointer;background:none;border:0}
 .rail-toggle{display:none;font-weight:600}
 .btn{padding:9px 16px;border-radius:8px;background:var(--ac);color:var(--acx);font-weight:600}
 .btn:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.7;cursor:default;filter:none}
 .btn-secondary{background:var(--sf2);color:var(--ink);border:1px solid var(--line)}
 .btn-danger{background:#C92A2A;color:#fff}
 .btn-sm{padding:6px 12px;font-size:13px}
@@ -110,6 +111,8 @@ button{cursor:pointer;background:none;border:0}
 .add-column-btn:hover{color:var(--ac)}
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(8,12,20,.55);z-index:50}
 .modal.show{display:flex}
+#confirm-dialog,#input-dialog{z-index:60}
+.rail-foot{margin-top:auto;padding:0 8px;font-size:12px;opacity:.5}
 .modal-content{width:min(420px,100%);max-height:100%;overflow:auto;padding:22px;background:var(--sf);border:1px solid var(--line);border-radius:14px}
 #task-modal,#column-modal,#board-manager-modal{justify-content:flex-end;align-items:stretch;padding:0}
 #task-modal .modal-content,#column-modal .modal-content,#board-manager-modal .modal-content{width:min(460px,100%);height:100%;border-radius:0;border-width:0 0 0 1px;animation:slide .22s ease-out}
@@ -133,7 +136,7 @@ button{cursor:pointer;background:none;border:0}
 .color-option.selected{border-color:var(--ink)}
 .color-circle{display:grid;place-items:center;width:22px;height:22px;border-radius:5px;font-size:12px;border:1px solid var(--line)}
 .color-circle.no-color,.color-circle.custom{background:var(--sf2)}
-.board-actions-row{display:flex;gap:8px;margin-bottom:16px}
+.board-actions-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
 .board-item-compact{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:10px}
 .board-item-compact.current-board{border-color:var(--ac)}
 .board-item-left,.board-item-right{display:flex;align-items:center;gap:8px}
@@ -195,3 +198,75 @@ box-shadow:0 1px 3px rgba(0,0,0,.18)}
 .drag-ghost.landing{transition:translate .26s cubic-bezier(.2,.9,.25,1),scale .26s cubic-bezier(.2,.9,.25,1),rotate .26s cubic-bezier(.2,.9,.25,1),box-shadow .26s ease}
 @keyframes settle{from{box-shadow:0 0 0 0 color-mix(in srgb,var(--ac) 70%,transparent)}to{box-shadow:0 0 0 10px transparent}}
 .task-card.just-dropped{animation:settle .55s ease-out}
+
+/* Scrollbars */
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--mute) 45%,transparent);border:3px solid transparent;border-radius:999px;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--mute);background-clip:content-box}
+::-webkit-scrollbar-corner{background:transparent}
+.rail::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);background-clip:content-box}
+.rail::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.4);background-clip:content-box}
+@supports not selector(::-webkit-scrollbar){
+    *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--mute) 45%,transparent) transparent}
+    .rail{scrollbar-color:rgba(255,255,255,.25) transparent}
+}
+
+/* Board manager: reorder + trash */
+.sort-select{padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--sf2);font-size:13px;font-weight:600;cursor:pointer}
+.board-item-compact{align-items:center}
+.board-item-compact[draggable=true]{cursor:grab}
+.board-item-compact.dragging{opacity:.4}
+.board-item-compact.drop-before{box-shadow:0 -3px 0 -1px var(--ac)}
+.board-item-compact.drop-after{box-shadow:0 3px 0 -1px var(--ac)}
+.board-item-left{min-width:0}
+.board-item-left .board-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drag-handle{color:var(--mute);letter-spacing:-2px;user-select:none;font-size:13px}
+.btn-move{padding:3px 7px;font-size:11px;color:var(--mute)}
+.btn-move:hover:not(:disabled){color:var(--ink);background:var(--sf2)}
+.btn-compact:disabled{opacity:.35;cursor:default}
+.trash-section{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.trash-section summary{cursor:pointer;font-weight:600;margin-bottom:10px;color:var(--mute)}
+.trash-section summary:hover{color:var(--ink)}
+.trash-empty{margin-top:4px}
+
+/* Wallpaper layer: same box as the board window (right of the sidebar), so the crop ratio matches it */
+.wallpaper{position:fixed;top:0;right:0;bottom:0;left:250px;z-index:0;pointer-events:none;background:center/cover no-repeat}
+.stage{position:relative;z-index:1}
+@media(max-width:900px){.wallpaper{left:0}}
+
+/* Header bar: optional semi-transparent + blur */
+[data-header=blur] .bar{background:color-mix(in srgb,var(--sf) 60%,transparent);-webkit-backdrop-filter:blur(var(--pbh,16px)) saturate(1.5);backdrop-filter:blur(var(--pbh,16px)) saturate(1.5)}
+[data-header=blur] :is(.find,.view-toggle){background:color-mix(in srgb,var(--sf2) 55%,transparent)}
+
+/* Wallpaper dialog + crop frame */
+.wp-content{width:min(560px,100%)}
+.wp-hint{margin-bottom:12px;font-size:13px;color:var(--mute)}
+.wp-frame{position:relative;overflow:hidden;width:min(100%,calc(52vh*var(--wp-ratio,1.6)));aspect-ratio:var(--wp-ratio,1.6);margin:0 auto;border-radius:10px;background:var(--sf2);box-shadow:0 0 0 1px var(--line);touch-action:none;user-select:none;-webkit-user-select:none}
+.wp-frame.editable{cursor:grab}
+.wp-frame.dragging{cursor:grabbing}
+.wp-frame img{display:none;position:absolute;left:0;top:0;max-width:none;transform-origin:0 0;pointer-events:none;will-change:transform}
+.wp-frame.has-img img{display:block}
+.wp-empty{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;font-size:14px;color:var(--mute)}
+.wp-frame.has-img .wp-empty{display:none}
+.wp-zoom{display:flex;align-items:center;gap:12px;margin-top:14px}
+.wp-zoom label{font-size:13px;font-weight:600}
+.wp-zoom .slider{flex:1}
+.wp-zoom.hidden{display:none}
+.wp-actions{flex-wrap:wrap}
+.wp-actions .wp-remove{margin-right:auto}
+.wp-actions .wp-remove[hidden]{display:none}
+.wp-toggle{display:flex;align-items:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);cursor:pointer}
+.wp-toggle input{width:18px;height:18px;flex:none;accent-color:var(--ac);cursor:pointer}
+.wp-toggle span{display:flex;flex-direction:column}
+.wp-toggle b{font-size:14px;font-weight:600}
+.wp-toggle small{font-size:12px;color:var(--mute)}
+.wp-toggle+.wp-toggle{margin-top:10px;padding-top:0;border-top:0}
+.wp-zoom output{min-width:38px;text-align:right;font-size:13px;color:var(--mute)}
+
+/* Translucent stages and cards: --pa is the opacity of the surface color */
+[data-glass-lanes=on] .lane{background:color-mix(in srgb,var(--sf) var(--pa,55%),transparent);-webkit-backdrop-filter:blur(var(--pbs,10px));backdrop-filter:blur(var(--pbs,10px))}
+[data-glass-lanes=on] .lane:has(.column-menu.show){position:relative;z-index:30}
+[data-glass-lanes=on] .add-lane{background:color-mix(in srgb,var(--sf) var(--pa,55%),transparent)}
+[data-glass-cards=on] .task-card:not(.is-placeholder){background:color-mix(in srgb,var(--sf2) var(--pa,55%),transparent)}
+[data-glass-cards=on] .task-card.colored:not(.is-placeholder){background:color-mix(in srgb,color-mix(in srgb,var(--tc) 30%,var(--sf2)) var(--pa,55%),transparent)}

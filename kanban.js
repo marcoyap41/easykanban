@@ -43,6 +43,9 @@ class EasyKanban {
         this.changeColumnLayout(savedLayout);
         this.updateLayoutButton();
 
+        // Wallpaper + header bar style
+        this.initAppearance();
+
         // Load board data
         this.loadSavedBoards();
         
@@ -54,8 +57,16 @@ class EasyKanban {
         // Initialize event listeners
         this.initializeEventListeners();
         
-        // Auto-save every 5 minutes
-        setInterval(() => this.autoSave(), 300000);
+        // Autosave toggle (off by default) and save-state watcher
+        this.autosaveEnabled = localStorage.getItem('kanban-autosave') === 'true';
+        this.updateAutosaveButton();
+        this.updateSaveButton();
+        setInterval(() => this.watchSaveState(), 1000);
+        window.addEventListener('beforeunload', (e) => {
+            if (this.isSaved()) return;
+            e.preventDefault();
+            e.returnValue = '';
+        });
         
         // Initialize search
         this.initializeSearch();
@@ -254,6 +265,327 @@ class EasyKanban {
         button.title = `Current: ${names[this.currentColumnLayout]} - Click to change`;
     }
 
+    // Appearance: header blur + custom wallpaper
+    initAppearance() {
+        this.setHeaderBlur(localStorage.getItem('kanban-header-blur') === 'true');
+        this.glass = { lanes: localStorage.getItem('kanban-glass-lanes') === 'true', cards: localStorage.getItem('kanban-glass-cards') === 'true' };
+        const savedOpacity = parseInt(localStorage.getItem('kanban-glass-opacity'));
+        this.setGlass('lanes', this.glass.lanes);
+        this.setGlass('cards', this.glass.cards);
+        this.setGlassOpacity(isNaN(savedOpacity) ? 55 : savedOpacity);
+        const oldBlur = parseInt(localStorage.getItem('kanban-glass-blur')); // earlier single slider
+        const hb = parseInt(localStorage.getItem('kanban-header-blur-amount'));
+        const sb = parseInt(localStorage.getItem('kanban-stage-blur-amount'));
+        this.setGlassBlur('header', !isNaN(hb) ? hb : (!isNaN(oldBlur) ? oldBlur : 16));
+        this.setGlassBlur('stage', !isNaN(sb) ? sb : (!isNaN(oldBlur) ? oldBlur : 10));
+        this.wallpaperBlob = null;
+        this.wallpaperUrl = null;
+        this.wp = null;
+        this.updateWallpaperButton();
+        this.initWallpaperModal();
+        this.loadWallpaper();
+    }
+
+    setHeaderBlur(on) {
+        this.headerBlur = !!on;
+        document.body.setAttribute('data-header', this.headerBlur ? 'blur' : 'solid');
+        localStorage.setItem('kanban-header-blur', this.headerBlur);
+        const box = document.getElementById('header-blur-toggle');
+        if (box) box.checked = this.headerBlur;
+        this.updateGlassControls();
+        this.updateWallpaperButton();
+    }
+
+    // Translucent stages / cards (opacity is shared, lower = more wallpaper visible)
+    setGlass(kind, on) {
+        this.glass[kind] = !!on;
+        document.body.setAttribute(`data-glass-${kind}`, this.glass[kind] ? 'on' : 'off');
+        localStorage.setItem(`kanban-glass-${kind}`, this.glass[kind]);
+        const box = document.getElementById(`glass-${kind}-toggle`);
+        if (box) box.checked = this.glass[kind];
+        this.updateGlassControls();
+    }
+
+    // Opacity applies to stages/cards; blur has its own slider for the header bar and for stages
+    updateGlassControls() {
+        const g = this.glass || {};
+        const set = (id, rowId, on) => {
+            const el = document.getElementById(id), row = document.getElementById(rowId);
+            if (el) el.disabled = !on;
+            if (row) row.style.opacity = on ? '' : '.5';
+        };
+        set('glass-opacity', 'glass-opacity-row', !!(g.lanes || g.cards));
+        set('header-blur-amount', 'header-blur-row', !!this.headerBlur);
+        set('stage-blur-amount', 'stage-blur-row', !!g.lanes);
+    }
+
+    setGlassBlur(kind, value) {
+        const def = kind === 'header' ? 16 : 10;
+        const v = parseInt(value);
+        const px = isNaN(v) ? def : Math.min(30, Math.max(0, v));
+        document.body.style.setProperty(kind === 'header' ? '--pbh' : '--pbs', px + 'px');
+        localStorage.setItem(`kanban-${kind}-blur-amount`, px);
+        const slider = document.getElementById(`${kind}-blur-amount`);
+        if (slider) slider.value = px;
+        const out = document.getElementById(`${kind}-blur-val`);
+        if (out) out.textContent = px + 'px';
+    }
+
+    setGlassOpacity(value) {
+        const v = Math.min(95, Math.max(20, parseInt(value) || 55));
+        document.body.style.setProperty('--pa', v + '%');
+        localStorage.setItem('kanban-glass-opacity', v);
+        const slider = document.getElementById('glass-opacity');
+        if (slider) slider.value = v;
+        const out = document.getElementById('glass-opacity-val');
+        if (out) out.textContent = v + '%';
+    }
+
+    // The wallpaper image is a Blob in IndexedDB (too big for localStorage next to the boards)
+    wpDb() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open('easykanban', 1);
+            req.onupgradeneeded = () => req.result.createObjectStore('kv');
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async wpStore(mode, fn) {
+        const db = await this.wpDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('kv', mode);
+            const req = fn(tx.objectStore('kv'));
+            tx.oncomplete = () => { db.close(); resolve(req.result); };
+            tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
+        });
+    }
+
+    async loadWallpaper() {
+        try {
+            this.showWallpaper(await this.wpStore('readonly', s => s.get('wallpaper')) || null);
+        } catch (e) {
+            this.showWallpaper(null);
+        }
+    }
+
+    showWallpaper(blob) {
+        if (this.wallpaperUrl) URL.revokeObjectURL(this.wallpaperUrl);
+        this.wallpaperUrl = blob ? URL.createObjectURL(blob) : null;
+        this.wallpaperBlob = blob;
+        document.getElementById('wallpaper').style.backgroundImage = blob ? `url("${this.wallpaperUrl}")` : '';
+        this.updateWallpaperButton();
+    }
+
+    updateWallpaperButton() {
+        const btn = document.getElementById('wallpaper-button');
+        if (!btn) return;
+        btn.querySelector('.v').textContent = this.wallpaperBlob ? 'Custom' : 'Default';
+        btn.title = 'Wallpaper and header bar style';
+    }
+
+    initWallpaperModal() {
+        const frame = document.getElementById('wp-frame');
+        const modal = document.getElementById('wallpaper-modal');
+        let drag = null;
+
+        frame.addEventListener('pointerdown', (e) => {
+            if (!this.wp || !this.wp.editable) return;
+            drag = { x: e.clientX, y: e.clientY, moved: false };
+            frame.setPointerCapture(e.pointerId);
+            frame.classList.add('dragging');
+        });
+        frame.addEventListener('pointermove', (e) => {
+            if (!drag) return;
+            const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+            if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
+            drag.x = e.clientX; drag.y = e.clientY;
+            this.wp.ox += dx; this.wp.oy += dy;
+            this.wpRender();
+        });
+        const end = () => {
+            if (!drag) return;
+            // A drag that ends over the dimmed backdrop must not count as a backdrop click
+            if (drag.moved) { this._wpSuppressClick = true; setTimeout(() => { this._wpSuppressClick = false; }, 60); }
+            drag = null;
+            frame.classList.remove('dragging');
+        };
+        frame.addEventListener('pointerup', end);
+        frame.addEventListener('pointercancel', end);
+        modal.addEventListener('click', (e) => {
+            if (this._wpSuppressClick) { e.stopPropagation(); e.preventDefault(); }
+        }, true);
+
+        frame.addEventListener('wheel', (e) => {
+            if (!this.wp || !this.wp.editable) return;
+            e.preventDefault();
+            const r = frame.getBoundingClientRect();
+            this.wpSetZoom(this.wp.zoom * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+        }, { passive: false });
+
+        document.getElementById('wp-zoom').addEventListener('input', (e) => {
+            if (this.wp && this.wp.editable) this.wpSetZoom(parseFloat(e.target.value));
+        });
+    }
+
+    openWallpaperModal() {
+        document.body.classList.remove('rail-open');
+        this.wpReset();
+
+        // The crop frame copies the exact box the wallpaper layer occupies
+        const box = document.getElementById('wallpaper').getBoundingClientRect();
+        const ratio = box.width / box.height;
+        this.wp = { ratio, boxW: Math.round(box.width), boxH: Math.round(box.height), editable: false, zoom: 1 };
+
+        const frame = document.getElementById('wp-frame');
+        frame.style.setProperty('--wp-ratio', ratio);
+        document.getElementById('wp-hint').textContent =
+            `The frame matches your board area (${this.wp.boxW} × ${this.wp.boxH} px, ${ratio.toFixed(2)}:1). Drag to move, scroll or use the slider to zoom.`;
+        document.getElementById('wp-remove').hidden = !this.wallpaperBlob;
+        document.getElementById('wp-choose').textContent = this.wallpaperBlob ? 'Change image' : 'Choose image';
+        document.getElementById('wp-apply').disabled = true;
+        document.getElementById('wp-zoom-row').classList.add('hidden');
+
+        document.getElementById('wallpaper-modal').classList.add('show');
+
+        if (this.wallpaperUrl) {
+            const token = this.wp;
+            this.wpLoadImage(this.wallpaperUrl).then((im) => {
+                if (this.wp === token && !token.img) this.wpShowImage(im, false);
+            }).catch(() => {});
+        }
+    }
+
+    closeWallpaperModal() {
+        document.getElementById('wallpaper-modal').classList.remove('show');
+        this.wpReset();
+    }
+
+    wpReset() {
+        if (this._wpTempUrl) { URL.revokeObjectURL(this._wpTempUrl); this._wpTempUrl = null; }
+        this.wp = null;
+        const frame = document.getElementById('wp-frame');
+        if (frame) frame.classList.remove('has-img', 'editable', 'dragging');
+        const img = document.getElementById('wp-img');
+        if (img) img.removeAttribute('src');
+        const file = document.getElementById('wp-file');
+        if (file) file.value = '';
+    }
+
+    wpLoadImage(url) {
+        return new Promise((resolve, reject) => {
+            const im = new Image();
+            im.onload = () => resolve(im);
+            im.onerror = () => reject(new Error('decode'));
+            im.src = url;
+        });
+    }
+
+    handleWallpaperFile(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file || !this.wp) return;
+        if (!file.type.startsWith('image/')) {
+            this.showToast('Please choose an image file', 'error');
+            return;
+        }
+        const url = URL.createObjectURL(file);
+        this.wpLoadImage(url).then((im) => {
+            if (!this.wp) { URL.revokeObjectURL(url); return; }
+            if (this._wpTempUrl) URL.revokeObjectURL(this._wpTempUrl);
+            this._wpTempUrl = url;
+            this.wpShowImage(im, true);
+        }).catch(() => {
+            URL.revokeObjectURL(url);
+            this.showToast('Could not read that image', 'error');
+        });
+    }
+
+    wpShowImage(im, editable) {
+        const wp = this.wp;
+        const frame = document.getElementById('wp-frame');
+        const img = document.getElementById('wp-img');
+        img.src = im.src;
+        img.style.width = im.naturalWidth + 'px';
+        img.style.height = im.naturalHeight + 'px';
+        frame.classList.add('has-img');
+        frame.classList.toggle('editable', editable);
+
+        wp.img = im;
+        wp.iw = im.naturalWidth;
+        wp.ih = im.naturalHeight;
+        wp.editable = editable;
+        wp.fw = frame.clientWidth;
+        wp.fh = frame.clientHeight;
+        wp.base = Math.max(wp.fw / wp.iw, wp.fh / wp.ih); // smallest scale that still covers the frame
+        wp.zoom = 1;
+        wp.ox = (wp.fw - wp.iw * wp.base) / 2;
+        wp.oy = (wp.fh - wp.ih * wp.base) / 2;
+
+        document.getElementById('wp-zoom').value = 1;
+        document.getElementById('wp-zoom-row').classList.toggle('hidden', !editable);
+        document.getElementById('wp-apply').disabled = !editable;
+        this.wpRender();
+    }
+
+    wpRender() {
+        const wp = this.wp;
+        if (!wp || !wp.img) return;
+        const s = wp.base * wp.zoom;
+        wp.ox = Math.min(0, Math.max(wp.fw - wp.iw * s, wp.ox));
+        wp.oy = Math.min(0, Math.max(wp.fh - wp.ih * s, wp.oy));
+        document.getElementById('wp-img').style.transform = `translate(${wp.ox}px, ${wp.oy}px) scale(${s})`;
+    }
+
+    // Zoom keeps the point (cx, cy) of the frame fixed under the cursor/center
+    wpSetZoom(z, cx = this.wp.fw / 2, cy = this.wp.fh / 2) {
+        const wp = this.wp;
+        const nz = Math.min(4, Math.max(1, z));
+        const oldS = wp.base * wp.zoom, newS = wp.base * nz;
+        const px = (cx - wp.ox) / oldS, py = (cy - wp.oy) / oldS;
+        wp.ox = cx - px * newS;
+        wp.oy = cy - py * newS;
+        wp.zoom = nz;
+        document.getElementById('wp-zoom').value = nz;
+        this.wpRender();
+    }
+
+    async saveWallpaper() {
+        const wp = this.wp;
+        if (!wp || !wp.editable || !wp.img) return;
+        const s = wp.base * wp.zoom;
+        const sx = -wp.ox / s, sy = -wp.oy / s, sw = wp.fw / s, sh = wp.fh / s;
+        const k = Math.min(1, 2560 / Math.max(sw, sh)); // never upscale, cap the longest side
+        const outW = Math.max(1, Math.round(sw * k));
+        const outH = Math.max(1, Math.round(outW / wp.ratio));
+        const canvas = document.createElement('canvas');
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(wp.img, sx, sy, sw, sh, 0, 0, outW, outH);
+        try {
+            const blob = await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('encode')), 'image/jpeg', 0.9));
+            await this.wpStore('readwrite', st => st.put(blob, 'wallpaper'));
+            this.showWallpaper(blob);
+            this.closeWallpaperModal();
+            this.showToast('Wallpaper applied', 'success');
+        } catch (e) {
+            this.showToast('Could not save the wallpaper (browser storage blocked or full)', 'error');
+        }
+    }
+
+    async removeWallpaper() {
+        try {
+            await this.wpStore('readwrite', st => st.delete('wallpaper'));
+        } catch (e) {
+            this.showToast('Could not remove the wallpaper', 'error');
+            return;
+        }
+        this.showWallpaper(null);
+        this.closeWallpaperModal();
+        this.showToast('Wallpaper removed', 'info');
+    }
+
     // Column Movement
     moveColumnLeft(columnId) {
         const sortedColumns = [...this.columns].sort((a, b) => a.order - b.order);
@@ -323,9 +655,9 @@ class EasyKanban {
                 this.currentBoardName = e.target.value || 'My Board';
             });
 
-            // Save only when user finishes editing (loses focus)
+            // Commit when user finishes editing (loses focus)
             boardNameInput.addEventListener('blur', () => {
-                this.saveCurrentBoard();
+                this.commit();
             });
 
             // Also save on Enter key
@@ -550,23 +882,84 @@ class EasyKanban {
         return JSON.stringify([this.currentBoardName, this.tasks, this.columns]);
     }
 
+    // True when the open board is identical to what is stored
+    isSaved() {
+        return this.boardSignature() === this._savedSig;
+    }
+
     // Remember the state that is known to be on disk
     markSaved(stamp) {
         this._savedSig = this.boardSignature();
         this.boardStamp = stamp || null;
+        this.updateSaveButton();
     }
 
-    // Timer save: does nothing (and stays silent) unless the board really changed
-    autoSave() {
+    // Called after every edit: persists only when autosave is on.
+    // With autosave off the board stays unsaved until the Save button (or a board switch) saves it.
+    commit() {
+        if (this.autosaveEnabled) this.saveCurrentBoard();
+        else this.updateSaveButton();
+    }
+
+    // Save button shows "Saved ✔" (disabled) when there is nothing to save
+    updateSaveButton() {
+        const button = document.getElementById('save-button');
+        if (!button) return;
+        const saved = this.isSaved();
+        button.disabled = saved;
+        button.textContent = saved ? 'Saved ✔' : 'Save';
+    }
+
+    // Runs every second: keeps the Save button honest and, if enabled, autosaves
+    // once the board has been dirty and untouched for a couple of seconds
+    watchSaveState() {
         if (this.drag) return;
-        if (this.boardSignature() === this._savedSig) return;
-        this.saveCurrentBoard();
+        const sig = this.boardSignature();
+        if (sig !== this._watchSig) {
+            this._watchSig = sig;
+            this._stableTicks = 0;
+        } else {
+            this._stableTicks = (this._stableTicks || 0) + 1;
+        }
+        this.updateSaveButton();
+        if (this.autosaveEnabled && sig !== this._savedSig && this._stableTicks >= 2) {
+            this.saveCurrentBoard();
+        }
+    }
+
+    toggleAutosave() {
+        if (this.autosaveEnabled) {
+            this.showConfirmDialog('Disable autosave', 'Changes will no longer be saved automatically.\n\nYou will need to click Save, or you may lose them when leaving the page.', (confirmed) => {
+                if (confirmed) this.setAutosave(false);
+            });
+        } else {
+            this.setAutosave(true);
+        }
+    }
+
+    setAutosave(enabled) {
+        this.autosaveEnabled = enabled;
+        localStorage.setItem('kanban-autosave', this.autosaveEnabled);
+        this.updateAutosaveButton();
+        this.showToast(`Autosave ${this.autosaveEnabled ? 'enabled' : 'disabled'}`, 'info');
+    }
+
+    updateAutosaveButton() {
+        const button = document.getElementById('autosave-button');
+        if (!button) return;
+        button.querySelector('.v').textContent = this.autosaveEnabled ? 'On' : 'Off';
+        button.title = `Autosave is ${this.autosaveEnabled ? 'on' : 'off'} - Click to change`;
     }
 
     // Other tabs write to localStorage, this tab gets a 'storage' event
     initializeCrossTabSync() {
         window.addEventListener('storage', (e) => {
             if (e.storageArea !== localStorage) return;
+            if (e.key === 'kanban-board-order' || e.key === 'kanban-trash-boards') {
+                this.renderRail();
+                this.refreshBoardManager();
+                return;
+            }
             if (e.key !== null && e.key !== 'kanban-saved-boards') return;
             clearTimeout(this._syncTimer);
             this._syncTimer = setTimeout(() => this.syncFromStorage(), 150);
@@ -587,9 +980,10 @@ class EasyKanban {
 
         if (!theirs) {
             // The board open here was removed elsewhere. Keep our copy rather than lose it;
-            // clearing the signature makes the next auto-save put it back.
+            // clearing the signature marks it unsaved so it can be written back.
             if (mine) stored[this.currentBoardId] = mine;
             this._savedSig = null;
+            this.updateSaveButton();
         } else if (new Date(theirs.lastModified) > new Date(this.boardStamp || 0)) {
             // Another tab saved a newer version of the board that is open here
             this.currentBoardName = theirs.name;
@@ -610,6 +1004,7 @@ class EasyKanban {
         } else {
             this.renderRail();
         }
+        this.refreshBoardManager();
     }
 
     saveCurrentBoard() {
@@ -664,8 +1059,105 @@ class EasyKanban {
         }
     }
 
+    // ---- Board order (kept in its own key so board data itself never changes) ----
+    getOrderedBoardIds() {
+        let saved = [];
+        try { saved = JSON.parse(localStorage.getItem('kanban-board-order')) || []; } catch (e) { saved = []; }
+        if (!Array.isArray(saved)) saved = [];
+        const ids = Object.keys(this.savedBoards);
+        const ordered = saved.filter(id => ids.includes(id));
+        ids.forEach(id => { if (!ordered.includes(id)) ordered.push(id); });
+        return ordered;
+    }
+
+    setBoardOrder(ids) {
+        try {
+            localStorage.setItem('kanban-board-order', JSON.stringify(ids));
+        } catch (e) {
+            this.showToast('Could not save board order', 'error');
+            return;
+        }
+        this.renderRail();
+        this.refreshBoardManager();
+    }
+
+    moveBoard(boardId, dir) {
+        const ids = this.getOrderedBoardIds();
+        const i = ids.indexOf(boardId);
+        const j2 = i + dir;
+        if (i < 0 || j2 < 0 || j2 >= ids.length) return;
+        [ids[i], ids[j2]] = [ids[j2], ids[i]];
+        this.setBoardOrder(ids);
+    }
+
+    moveBoardTo(boardId, targetId, after) {
+        if (boardId === targetId) return;
+        const ids = this.getOrderedBoardIds().filter(id => id !== boardId);
+        const t = ids.indexOf(targetId);
+        if (t < 0) return;
+        ids.splice(after ? t + 1 : t, 0, boardId);
+        this.setBoardOrder(ids);
+    }
+
+    // ---- Trash ----
+    readTrash() {
+        try {
+            const t = JSON.parse(localStorage.getItem('kanban-trash-boards'));
+            return t && typeof t === 'object' && !Array.isArray(t) ? t : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    writeTrash(trash) {
+        try {
+            localStorage.setItem('kanban-trash-boards', JSON.stringify(trash));
+            return true;
+        } catch (e) {
+            this.showToast('Could not update trash: browser storage is full or blocked', 'error');
+            return false;
+        }
+    }
+
+    restoreBoard(boardId) {
+        const trash = this.readTrash();
+        const item = trash[boardId];
+        if (!item) return;
+        const { deletedAt, ...board } = item;
+        this.savedBoards[boardId] = board;
+        if (!this.saveBoardsToStorage([boardId])) return;
+        delete trash[boardId];
+        this.writeTrash(trash);
+        this.refreshBoardManager();
+        this.showToast(`Restored board: ${board.name}`, 'success');
+    }
+
+    deleteBoardForever(boardId) {
+        const item = this.readTrash()[boardId];
+        if (!item) return;
+        this.showConfirmDialog('Delete permanently', `Permanently delete "${item.name}"?\n\nThis action cannot be undone.`, () => {
+            const trash = this.readTrash();
+            delete trash[boardId];
+            if (this.writeTrash(trash)) {
+                this.refreshBoardManager();
+                this.showToast(`Permanently deleted: ${item.name}`, 'info');
+            }
+        });
+    }
+
+    emptyTrash() {
+        const count = Object.keys(this.readTrash()).length;
+        if (!count) return;
+        this.showConfirmDialog('Empty trash', `Permanently delete ${count} board${count === 1 ? '' : 's'} in the trash?\n\nThis action cannot be undone.`, () => {
+            if (this.writeTrash({})) {
+                this.refreshBoardManager();
+                this.showToast('Trash emptied', 'info');
+            }
+        });
+    }
+
+    // ---- Board manager ----
     openBoardManager() {
-        // Create modal if it doesn't exist
         let modal = document.getElementById('board-manager-modal');
         if (!modal) {
             modal = document.createElement('div');
@@ -682,48 +1174,89 @@ class EasyKanban {
                             <button class="btn btn-sm" onclick="kanban.createNewBoard()">New board</button>
                             <button class="btn btn-sm btn-secondary" onclick="kanban.duplicateCurrentBoard()">Duplicate board</button>
                         </div>
-                        
-                        <div class="boards-list-compact">
-                            <div class="board-item-compact current-board">
-                                <div class="board-item-left">
-                                    <span class="board-status">●</span>
-                                    <span class="board-name">${this.escapeHtml(this.currentBoardName)}</span>
-                                    <span class="board-badge">Current</span>
-                                </div>
-                                <div class="board-item-right">
-                                    <span class="board-stats">${this.tasks.length}T/${this.columns.length}C</span>
-                                    <span class="board-save-status">${this.getCompactSaveInfo()}</span>
-                                </div>
-                            </div>
-                            
-                            <div class="boards-divider"></div>
-                            
-                            <div id="saved-boards-list-compact">
-                                ${this.renderCompactBoardsList()}
-                            </div>
-                        </div>
-                        
-                        <div class="board-manager-footer">
-                            <small class="footer-note">Boards auto-save every 5 minutes</small>
-                        </div>
+                        <div class="boards-list-compact" id="saved-boards-list-compact"></div>
+                        <div id="board-trash"></div>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
-        } else {
-            // Update existing modal content
-            const currentBoardName = modal.querySelector('.current-board .board-name');
-            const currentBoardStats = modal.querySelector('.current-board .board-stats');
-            const currentBoardSaveStatus = modal.querySelector('.current-board .board-save-status');
-            const savedBoardsList = modal.querySelector('#saved-boards-list-compact');
-            
-            if (currentBoardName) currentBoardName.textContent = this.currentBoardName;
-            if (currentBoardStats) currentBoardStats.textContent = `${this.tasks.length}T/${this.columns.length}C`;
-            if (currentBoardSaveStatus) currentBoardSaveStatus.textContent = this.getCompactSaveInfo();
-            if (savedBoardsList) savedBoardsList.innerHTML = this.renderCompactBoardsList();
+            this.initBoardDrag(modal);
         }
-
+        this.refreshBoardManager();
         modal.classList.add('show');
+    }
+
+    refreshBoardManager() {
+        const modal = document.getElementById('board-manager-modal');
+        if (!modal) return;
+        modal.querySelector('#saved-boards-list-compact').innerHTML = this.renderCompactBoardsList();
+        modal.querySelector('#board-trash').innerHTML = this.renderTrashSection();
+    }
+
+    // Drag a board row to reorder (buttons do the same for touch / keyboard)
+    initBoardDrag(modal) {
+        const rowOf = e => e.target.closest && e.target.closest('[data-board-id]');
+        const clear = () => modal.querySelectorAll('.drop-before,.drop-after,.dragging')
+            .forEach(el => el.classList.remove('drop-before', 'drop-after', 'dragging'));
+        const isAfter = (e, row) => {
+            const r = row.getBoundingClientRect();
+            return e.clientY > r.top + r.height / 2;
+        };
+        modal.addEventListener('dragstart', e => {
+            const row = rowOf(e);
+            if (!row) return;
+            this._dragBoardId = row.dataset.boardId;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this._dragBoardId);
+            row.classList.add('dragging');
+        });
+        modal.addEventListener('dragover', e => {
+            const row = rowOf(e);
+            if (!row || !this._dragBoardId) return;
+            e.preventDefault();
+            modal.querySelectorAll('.drop-before,.drop-after').forEach(el => el.classList.remove('drop-before', 'drop-after'));
+            row.classList.add(isAfter(e, row) ? 'drop-after' : 'drop-before');
+        });
+        modal.addEventListener('drop', e => {
+            const row = rowOf(e);
+            if (!row || !this._dragBoardId) return;
+            e.preventDefault();
+            const id = this._dragBoardId;
+            this._dragBoardId = null;
+            clear();
+            this.moveBoardTo(id, row.dataset.boardId, isAfter(e, row));
+        });
+        modal.addEventListener('dragend', () => {
+            this._dragBoardId = null;
+            clear();
+        });
+    }
+
+    renderTrashSection() {
+        const trash = this.readTrash();
+        const ids = Object.keys(trash).sort((a, b) => new Date(trash[b].deletedAt || 0) - new Date(trash[a].deletedAt || 0));
+        const rows = ids.map(id => {
+            const b = trash[id];
+            const n = b.tasks ? b.tasks.length : 0;
+            const c = b.columns ? b.columns.length : 3;
+            const when = b.deletedAt ? new Date(b.deletedAt).toLocaleDateString() : '';
+            return `
+                <div class="board-item-compact">
+                    <div class="board-item-left">
+                        <span class="board-name">${this.escapeHtml(b.name)}</span>
+                    </div>
+                    <div class="board-item-right">
+                        <span class="board-stats">${n}T/${c}C${when ? ' · ' + when : ''}</span>
+                        <button class="btn-compact" onclick="kanban.restoreBoard('${id}')" title="Restore">Restore</button>
+                        <button class="btn-compact btn-danger" onclick="kanban.deleteBoardForever('${id}')" title="Delete permanently">×</button>
+                    </div>
+                </div>`;
+        }).join('');
+        return `
+            <details class="trash-section" ${this._trashOpen ? 'open' : ''} ontoggle="kanban._trashOpen = this.open">
+                <summary>Trash (${ids.length})</summary>
+                ${ids.length ? rows + '<button class="btn-compact btn-danger trash-empty" onclick="kanban.emptyTrash()">Empty trash</button>' : '<div class="empty-state-compact">Trash is empty</div>'}
+            </details>`;
     }
 
     renderSavedBoardsList() {
@@ -756,32 +1289,37 @@ class EasyKanban {
     }
 
     renderCompactBoardsList() {
-        const boardIds = Object.keys(this.savedBoards).filter(id => id !== this.currentBoardId);
-        
-        if (boardIds.length === 0) {
-            return '<div class="empty-state-compact">No other boards saved</div>';
+        const ids = this.getOrderedBoardIds();
+        if (ids.length === 0) {
+            return '<div class="empty-state-compact">No boards saved</div>';
         }
-
-        return boardIds.map(boardId => {
+        return ids.map((boardId, i) => {
+            const cur = boardId === this.currentBoardId;
             const board = this.savedBoards[boardId];
-            const taskCount = board.tasks ? board.tasks.length : 0;
-            const columnCount = board.columns ? board.columns.length : 3;
-            
+            const name = cur ? this.currentBoardName : board.name;
+            const taskCount = cur ? this.tasks.length : (board.tasks ? board.tasks.length : 0);
+            const columnCount = cur ? this.columns.length : (board.columns ? board.columns.length : 3);
             return `
-                <div class="board-item-compact">
+                <div class="board-item-compact${cur ? ' current-board' : ''}" draggable="true" data-board-id="${boardId}">
                     <div class="board-item-left">
-                        <span class="board-name">${this.escapeHtml(board.name)}</span>
+                        <span class="drag-handle" title="Drag to reorder" aria-hidden="true">⋮⋮</span>
+                        <span class="board-name">${this.escapeHtml(name)}</span>
+                        ${cur ? '<span class="board-badge">Current</span>' : ''}
                     </div>
                     <div class="board-item-right">
                         <span class="board-stats">${taskCount}T/${columnCount}C</span>
-                        <button class="btn-compact" onclick="kanban.switchToBoard('${boardId}')" title="Open">Open</button>
-                        <button class="btn-compact btn-danger" onclick="kanban.deleteBoard('${boardId}')" title="Delete">×</button>
+                        <button class="btn-compact btn-move" onclick="kanban.moveBoard('${boardId}', -1)" ${i === 0 ? 'disabled' : ''} title="Move up" aria-label="Move up">▲</button>
+                        <button class="btn-compact btn-move" onclick="kanban.moveBoard('${boardId}', 1)" ${i === ids.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move down">▼</button>
+                        ${cur
+                            ? `<span class="board-save-status">${this.getCompactSaveInfo()}</span>`
+                            : `<button class="btn-compact" onclick="kanban.switchToBoard('${boardId}')" title="Open">Open</button>
+                               <button class="btn-compact btn-danger" onclick="kanban.deleteBoard('${boardId}')" title="Move to trash">×</button>`}
                     </div>
                 </div>
             `;
         }).join('');
     }
-    
+
     getCompactSaveInfo() {
         const board = this.savedBoards[this.currentBoardId];
         if (!board || !board.lastModified) return 'Not saved';
@@ -865,8 +1403,8 @@ class EasyKanban {
         const targetBoard = this.savedBoards[boardId];
         if (!targetBoard) return;
         
-        if (this.tasks.length > 0) {
-            this.showConfirmDialog('Switch Board', `Switch to "${targetBoard.name}"?\n\nYour current board will be saved automatically.`, (confirmed) => {
+        if (!this.isSaved()) {
+            this.showConfirmDialog('Switch Board', `Switch to "${targetBoard.name}"?\n\nYou have unsaved changes. They will be saved before switching.`, (confirmed) => {
                 if (confirmed) {
                     this.performBoardSwitch(boardId);
                 }
@@ -898,18 +1436,17 @@ class EasyKanban {
             return;
         }
         
-        this.showConfirmDialog('Delete Board', `Are you sure you want to delete the board "${board.name}"?\n\nThis action cannot be undone.`, (confirmed) => {
+        this.showConfirmDialog('Move to trash', `Move the board "${board.name}" to the trash?\n\nYou can restore it later from Manage boards > Trash.`, (confirmed) => {
             if (confirmed) {
+                // Copy to trash first, so a failed write can never lose the board
+                const trash = this.readTrash();
+                trash[boardId] = { ...board, deletedAt: new Date().toISOString() };
+                if (!this.writeTrash(trash)) return;
+                
                 delete this.savedBoards[boardId];
                 this.saveBoardsToStorage([], [boardId]);
-                
-                // Refresh the modal
-                const modal = document.getElementById('board-manager-modal');
-                if (modal && modal.classList.contains('show')) {
-                    this.openBoardManager();
-                }
-                
-                this.showToast(`Deleted board: ${board.name}`, 'info');
+                this.refreshBoardManager();
+                this.showToast(`Moved to trash: ${board.name}`, 'info');
             }
         });
     }
@@ -923,7 +1460,7 @@ class EasyKanban {
     saveColumnsToStorage() {
         // Deprecated - columns are saved with boards
         // Just save the current board instead
-        this.saveCurrentBoard();
+        this.commit();
     }
 
     openColumnModal(columnId = null) {
@@ -1091,7 +1628,7 @@ class EasyKanban {
             });
 
                 this.saveColumnsToStorage();
-                this.saveToStorage();
+                this.commit();
                 this.renderBoard();
                 this.showToast('Stage deleted', 'info');
             }
@@ -1146,7 +1683,7 @@ class EasyKanban {
         this.showConfirmDialog('Clear Board', 'Are you sure you want to clear all tasks? This cannot be undone.', (confirmed) => {
             if (confirmed) {
                 this.tasks = [];
-                this.saveCurrentBoard();
+                this.commit();
                 this.renderBoard();
                 this.showToast('Board cleared', 'info');
             }
@@ -1290,9 +1827,9 @@ class EasyKanban {
                     // Update UI
                     document.getElementById('board-name').value = this.currentBoardName;
                     this.renderBoard();
-                    this.saveCurrentBoard();
+                    this.commit();
                     this.saveColumnsToStorage();
-                    this.saveToStorage();
+                    this.commit();
                     this.showToast(`Board replaced with "${importedBoardName}"`, 'success');
                     
                 } else if (choice === 1) {
@@ -1479,7 +2016,7 @@ class EasyKanban {
         const isEditing = this.currentTaskId !== null;
         
         this.renderBoard();
-        this.saveToStorage();
+        this.commit();
         this.closeTaskModal();
         this.showToast(isEditing ? 'Task updated' : 'Task created', 'success');
     }
@@ -1489,7 +2026,7 @@ class EasyKanban {
             if (confirmed) {
                 this.tasks = this.tasks.filter(t => t.id !== taskId);
                 this.renderBoard();
-                this.saveToStorage();
+                this.commit();
                 this.showToast('Task deleted', 'info');
             }
         });
@@ -1549,7 +2086,7 @@ class EasyKanban {
         seq.forEach((t, i) => { t.order = i; });
 
         this.renderBoard();
-        this.saveToStorage();
+        this.commit();
         this.showToast(changedColumn ? `Task moved to ${this.columns.find(c => c.id === newColumn)?.title}` : 'Task reordered', 'success');
         return true;
     }
@@ -1663,7 +2200,7 @@ class EasyKanban {
         const boards = document.getElementById('rail-boards');
         const lanes = document.getElementById('rail-lanes');
         if (!boards || !lanes) return;
-        boards.innerHTML = Object.keys(this.savedBoards).map(id => {
+        boards.innerHTML = this.getOrderedBoardIds().map(id => {
             const b = this.savedBoards[id];
             const cur = id === this.currentBoardId;
             const name = this.escapeHtml(cur ? this.currentBoardName : b.name);
