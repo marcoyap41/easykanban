@@ -55,7 +55,7 @@ class EasyKanban {
         this.initializeEventListeners();
         
         // Auto-save every 5 minutes
-        setInterval(() => this.saveToStorage(), 300000);
+        setInterval(() => this.autoSave(), 300000);
         
         // Initialize search
         this.initializeSearch();
@@ -80,6 +80,9 @@ class EasyKanban {
 
         // Drag and drop (mouse, pen and touch share one pointer-based implementation)
         this.initializeDragAndDrop();
+
+        // Keep several open tabs in step with each other
+        this.initializeCrossTabSync();
 
         // Close modals on escape
         document.addEventListener('keydown', (e) => {
@@ -414,7 +417,7 @@ class EasyKanban {
                 lastModified: now,
                 createdAt: now
             };
-            this.saveBoardsToStorage();
+            this.saveBoardsToStorage([defaultBoardId]);
         }
     }
     
@@ -462,7 +465,7 @@ class EasyKanban {
                         lastModified: data.lastUpdated || new Date().toISOString(),
                         createdAt: new Date().toISOString()
                     };
-                    this.saveBoardsToStorage();
+                    this.saveBoardsToStorage([migratedBoardId]);
                     
                     // Set as current board
                     localStorage.setItem('kanban-current-board-id', migratedBoardId);
@@ -502,12 +505,111 @@ class EasyKanban {
                 { id: 'in-progress', title: 'In Progress', order: 1 },
                 { id: 'done', title: 'Done', order: 2 }
             ];
+            this.markSaved(board.lastModified);
         }
     }
 
-    saveBoardsToStorage() {
+    // Latest boards straight from localStorage (null if missing or unreadable).
+    // Unreadable data is copied to a backup key first so it can never be lost silently.
+    readStoredBoards() {
+        let raw = null;
+        try {
+            raw = localStorage.getItem('kanban-saved-boards');
+            const parsed = raw ? JSON.parse(raw) : null;
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+        } catch (e) {
+            console.error('Saved boards are unreadable:', e);
+            try { if (raw) localStorage.setItem('kanban-saved-boards-backup', raw); } catch (_) {}
+            return null;
+        }
+    }
+
+    // Merge-on-write. This tab never writes its whole in-memory copy over localStorage.
+    // It re-reads the latest data first, applies only what THIS tab changed, then saves:
+    //   changed = ids of boards this tab created or edited
+    //   removed = ids of boards this tab deleted on purpose
+    // so a tab that has been open for a while can't wipe out boards made in another tab.
+    saveBoardsToStorage(changed = [], removed = []) {
+        const latest = this.readStoredBoards() || {};
+        changed.forEach(id => { if (this.savedBoards[id]) latest[id] = this.savedBoards[id]; });
+        removed.forEach(id => { delete latest[id]; });
+        try {
+            localStorage.setItem('kanban-saved-boards', JSON.stringify(latest));
+        } catch (e) {
+            console.error('Failed to save boards:', e);
+            this.showToast('Could not save: browser storage is full or blocked', 'error');
+            return false;
+        }
+        this.savedBoards = latest;
         setTimeout(() => this.renderRail(), 0);
-        localStorage.setItem('kanban-saved-boards', JSON.stringify(this.savedBoards));
+        return true;
+    }
+
+    // What the current board looks like right now, used to tell whether anything changed
+    boardSignature() {
+        return JSON.stringify([this.currentBoardName, this.tasks, this.columns]);
+    }
+
+    // Remember the state that is known to be on disk
+    markSaved(stamp) {
+        this._savedSig = this.boardSignature();
+        this.boardStamp = stamp || null;
+    }
+
+    // Timer save: does nothing (and stays silent) unless the board really changed
+    autoSave() {
+        if (this.drag) return;
+        if (this.boardSignature() === this._savedSig) return;
+        this.saveCurrentBoard();
+    }
+
+    // Other tabs write to localStorage, this tab gets a 'storage' event
+    initializeCrossTabSync() {
+        window.addEventListener('storage', (e) => {
+            if (e.storageArea !== localStorage) return;
+            if (e.key !== null && e.key !== 'kanban-saved-boards') return;
+            clearTimeout(this._syncTimer);
+            this._syncTimer = setTimeout(() => this.syncFromStorage(), 150);
+        });
+    }
+
+    syncFromStorage() {
+        if (this.drag) { // never re-render in the middle of a drag
+            this._syncTimer = setTimeout(() => this.syncFromStorage(), 400);
+            return;
+        }
+        const stored = this.readStoredBoards();
+        if (!stored || Object.keys(stored).length === 0) return;
+
+        const mine = this.savedBoards[this.currentBoardId];
+        const theirs = stored[this.currentBoardId];
+        let adopted = false;
+
+        if (!theirs) {
+            // The board open here was removed elsewhere. Keep our copy rather than lose it;
+            // clearing the signature makes the next auto-save put it back.
+            if (mine) stored[this.currentBoardId] = mine;
+            this._savedSig = null;
+        } else if (new Date(theirs.lastModified) > new Date(this.boardStamp || 0)) {
+            // Another tab saved a newer version of the board that is open here
+            this.currentBoardName = theirs.name;
+            this.tasks = theirs.tasks || [];
+            this.columns = theirs.columns || this.columns;
+            this.markSaved(theirs.lastModified);
+            const nameInput = document.getElementById('board-name');
+            if (nameInput) nameInput.value = this.currentBoardName;
+            adopted = true;
+        } else if (mine) {
+            stored[this.currentBoardId] = mine; // ours is up to date, keep the live object
+        }
+
+        this.savedBoards = stored;
+        if (adopted) {
+            this.renderBoard();
+            this.showToast('Board updated from another tab', 'info');
+        } else {
+            this.renderRail();
+        }
     }
 
     saveCurrentBoard() {
@@ -534,7 +636,9 @@ class EasyKanban {
         };
         
         this.savedBoards[this.currentBoardId] = boardData;
-        this.saveBoardsToStorage();
+        const ok = this.saveBoardsToStorage([this.currentBoardId]);
+        if (ok) this.markSaved(boardData.lastModified);
+        return ok;
     }
 
     loadBoard(boardId) {
@@ -551,6 +655,7 @@ class EasyKanban {
             
             // Update current board ID in storage
             localStorage.setItem('kanban-current-board-id', boardId);
+            this.markSaved(board.lastModified);
             
             // Update UI
             document.getElementById('board-name').value = this.currentBoardName;
@@ -749,7 +854,7 @@ class EasyKanban {
                 };
                 
                 this.savedBoards[newBoardId] = duplicatedBoard;
-                this.saveBoardsToStorage();
+                this.saveBoardsToStorage([newBoardId]);
                 this.closeBoardManager();
                 this.showToast(`Duplicated board: ${boardName}`, 'success');
             }
@@ -796,7 +901,7 @@ class EasyKanban {
         this.showConfirmDialog('Delete Board', `Are you sure you want to delete the board "${board.name}"?\n\nThis action cannot be undone.`, (confirmed) => {
             if (confirmed) {
                 delete this.savedBoards[boardId];
-                this.saveBoardsToStorage();
+                this.saveBoardsToStorage([], [boardId]);
                 
                 // Refresh the modal
                 const modal = document.getElementById('board-manager-modal');
@@ -995,9 +1100,8 @@ class EasyKanban {
 
     // Storage Management
     saveToStorage() {
-        // Now just saves to the current board in savedBoards
-        this.saveCurrentBoard();
-        this.showToast('Board saved', 'success');
+        // Saves the current board (merged into whatever is already stored)
+        if (this.saveCurrentBoard()) this.showToast('Board saved', 'success');
     }
     
     getLastSaveInfo() {
@@ -1214,7 +1318,7 @@ class EasyKanban {
                     };
                     
                     this.savedBoards[newBoardName] = newBoard;
-                    this.saveBoardsToStorage();
+                    this.saveBoardsToStorage([newBoardName]);
                     
                     this.showToast(`Board imported as "${newBoardName}"`, 'success');
                 } else {
