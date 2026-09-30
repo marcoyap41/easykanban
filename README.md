@@ -1,20 +1,20 @@
-# EasyKanban
+# Kanvu
 
 A simple, customizable, and free Kanban task management web app with local data storage.
 
-Open one page, start organizing. No account, no setup, no subscription. EasyKanban gives you a fast, good-looking board that you can make entirely your own.
+Open one page, start organizing. No account, no setup, no subscription. Kanvu gives you a fast, good-looking board that you can make entirely your own.
 
-**Live demo: [easykanba.vercel.app](https://easykanba.vercel.app)**
+**Live demo: [kanvu.vercel.app](https://kanvu.vercel.app)**
 
-## Why EasyKanban
+## Why Kanvu
 
-There is no shortage of Kanban tools. Most of them are built for teams, and they come with sign-ups, workspaces, onboarding, and a pricing page. If all you want is a quick place to keep track of your own tasks, that is a lot of overhead. EasyKanban was built for that gap.
+There is no shortage of Kanban tools. Most of them are built for teams, and they come with sign-ups, workspaces, onboarding, and a pricing page. If all you want is a quick place to keep track of your own tasks, that is a lot of overhead. Kanvu was built for that gap.
 
 **Simple by design**
-EasyKanban is a single web page. There is no login to create, no email to confirm, and nothing to install. Open it and your board is ready. It is made for people who want quick, efficient access to a personal task board and nothing standing in the way.
+Kanvu is a single web page. There is no login to create, no email to confirm, and nothing to install. Open it and your board is ready. It is made for people who want quick, efficient access to a personal task board and nothing standing in the way.
 
 **Yours to customize**
-The main focus of EasyKanban is letting you shape the board to fit how you like to work and how you like it to look:
+The main focus of Kanvu is letting you shape the board to fit how you like to work and how you like it to look:
 - Set your own wallpaper, cropped to the exact ratio of the board so it always fits.
 - Choose a theme, and color-code stages and individual tasks.
 - Switch between a column layout and horizontal lanes, and pick how many columns to show and how detailed the cards are.
@@ -28,7 +28,7 @@ Boards are stored locally in your browser, not on someone else's server. There i
 
 ## Getting started
 
-**Use it online:** open [easykanba.vercel.app](https://easykanba.vercel.app) and start right away.
+**Use it online:** open [kanvu.vercel.app](https://kanvu.vercel.app) and start right away.
 
 **Run it locally:**
 1. Download or clone this repository.
@@ -80,4 +80,4 @@ Any recent version of Chrome, Edge, Firefox or Safari. The blur effects rely on 
 
 ## Credits
 
-Original EasyKanban by Marco Christian.
+Original Kanvu by Marco Christian.

@@ -16,6 +16,8 @@ button{cursor:pointer;background:none;border:0}
 .link{font-size:13px;color:var(--ac);font-weight:600}
 .rail-item{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:8px;text-align:left;color:inherit;font-size:14px}
 .rail-item:hover{background:rgba(255,255,255,.07)}
+.rail-item.static{cursor:default;pointer-events:none}
+.rail-item.static:hover{background:none}
 .rail-item.on{background:rgba(255,255,255,.14);font-weight:600}
 .rail-item .g{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rail-item em{font-style:normal;opacity:.6;font-size:13px}
@@ -52,6 +54,15 @@ button{cursor:pointer;background:none;border:0}
 .column-menu-item:hover:not(:disabled){background:var(--sf2)}
 .column-menu-item:disabled{opacity:.35;cursor:default}
 .column-menu-item.danger{color:#E03131}
+.column-menu-sep{height:1px;margin:4px 6px;background:var(--line)}
+/* stage drag and drop */
+.lane-head{cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.lane-head button{cursor:pointer}
+.column.is-placeholder-lane{background:color-mix(in srgb,var(--ac) 9%,transparent)!important;border:1.5px dashed color-mix(in srgb,var(--ac) 75%,transparent)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.column.is-placeholder-lane>*{visibility:hidden}
+.drag-ghost.stage-ghost{overflow:hidden;box-sizing:border-box}
+.drag-ghost.stage-ghost.lifted{scale:1.015;rotate:.6deg}
+.is-dragging-stage .column{cursor:grabbing}
 .tasks-container{position:relative;display:flex;gap:14px;padding:20px 16px 14px;overflow-x:auto;min-height:140px;scroll-snap-type:x proximity;transition:background-color .2s}
 .tasks-container.drag-over{background:color-mix(in srgb,var(--ac) 7%,transparent);border-radius:0 14px 14px 0}
 .tasks-container.drag-over>.empty{display:none}
@@ -61,12 +72,27 @@ button{cursor:pointer;background:none;border:0}
 .task-card:hover{border-color:var(--ac)}
 .task-card.colored:hover{border-color:color-mix(in srgb,var(--tc) 55%,var(--ink))}
 .t-main{min-width:0}
+.t-head{display:flex;align-items:flex-start;gap:8px}
+.t-head{gap:0}
+.t-check{appearance:none;-webkit-appearance:none;flex:none;width:0;height:16px;margin:2px 0 0;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 1.5px var(--mute);cursor:pointer;opacity:0;overflow:hidden;display:grid;place-content:center;transition:width .2s ease,margin-right .2s ease,opacity .15s ease,background-color .15s,box-shadow .15s}
+.t-check::after{content:"";width:8px;height:4px;border:solid var(--acx);border-width:0 0 2px 2px;transform:rotate(-45deg) translate(1px,-1px);opacity:0}
+.t-check:checked{width:16px;margin-right:8px;opacity:1;background:var(--ac);box-shadow:inset 0 0 0 1.5px var(--ac)}
+.t-check:checked::after{opacity:1}
+.task-card:hover .t-check,.task-card:focus-within .t-check{width:16px;margin-right:8px;opacity:1}
+.t-check:hover{box-shadow:inset 0 0 0 1.5px var(--ac)}
+@media(hover:none){.t-check{width:16px;margin-right:8px;opacity:1}}
+.archive-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:10px}
+.archive-info{display:flex;flex-direction:column;min-width:0}
+.archive-title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.archive-meta{font-size:12px;color:var(--mute)}
+.task-card.done .task-title{text-decoration:line-through;opacity:.7}
 .task-title{font:600 15px/1.3 var(--fh);overflow-wrap:anywhere}
 .task-description{margin-top:4px;color:var(--mute);font-size:13px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .t-side{display:flex;align-items:flex-start;gap:6px}
 .t-pct{display:none;font-size:12px;font-weight:600;padding-top:1px}
 .t-meta{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:12px}
 .m-item{display:flex;align-items:center;gap:6px}
+.m-prio{margin-left:auto}
 .lbl{color:var(--mute);font-size:12px}
 .pips{display:flex;gap:3px}
 .pips i{width:12px;height:5px;border-radius:2px;background:color-mix(in srgb,var(--ink) 18%,transparent)}
@@ -76,7 +102,6 @@ button{cursor:pointer;background:none;border:0}
 .t-progress{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600}
 .t-progress .track{flex:1;height:6px;border-radius:3px;background:color-mix(in srgb,var(--ink) 18%,transparent);overflow:hidden}
 .t-progress .track i{display:block;height:100%;border-radius:3px;background:var(--ac)}
-.task-card.colored .t-progress .track i{background:var(--ink)}
 .t-progress span{min-width:32px;text-align:right}
 .t-actions{display:flex;opacity:0}
 .task-card:hover .t-actions,.task-card:focus-within .t-actions{opacity:1}
@@ -114,8 +139,8 @@ button{cursor:pointer;background:none;border:0}
 #confirm-dialog,#input-dialog{z-index:60}
 .rail-foot{margin-top:auto;padding:0 8px;font-size:12px;opacity:.5}
 .modal-content{width:min(420px,100%);max-height:100%;overflow:auto;padding:22px;background:var(--sf);border:1px solid var(--line);border-radius:14px}
-#task-modal,#column-modal,#board-manager-modal{justify-content:flex-end;align-items:stretch;padding:0}
-#task-modal .modal-content,#column-modal .modal-content,#board-manager-modal .modal-content{width:min(460px,100%);height:100%;border-radius:0;border-width:0 0 0 1px;animation:slide .22s ease-out}
+#task-modal,#column-modal,#board-manager-modal,#archive-modal{justify-content:flex-end;align-items:stretch;padding:0}
+#task-modal .modal-content,#column-modal .modal-content,#board-manager-modal .modal-content,#archive-modal .modal-content{width:min(460px,100%);height:100%;border-radius:0;border-width:0 0 0 1px;animation:slide .22s ease-out}
 @keyframes slide{from{transform:translateX(28px);opacity:0}}
 @keyframes pulse{50%{transform:scale(1.04)}}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
@@ -249,19 +274,29 @@ box-shadow:0 1px 3px rgba(0,0,0,.18)}
 .wp-frame.has-img img{display:block}
 .wp-empty{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;font-size:14px;color:var(--mute)}
 .wp-frame.has-img .wp-empty{display:none}
+.wp-frame:not(.has-img){cursor:pointer}
+.wp-frame:not(.has-img):hover{box-shadow:0 0 0 1.5px var(--ac)}
+.wp-frame:not(.has-img):hover .wp-empty{color:var(--ink)}
+.wp-frame:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .wp-zoom{display:flex;align-items:center;gap:12px;margin-top:14px}
 .wp-zoom label{font-size:13px;font-weight:600}
 .wp-zoom .slider{flex:1}
 .wp-zoom.hidden{display:none}
 .wp-actions{flex-wrap:wrap}
 .wp-actions .wp-remove{margin-right:auto}
-.wp-actions .wp-remove[hidden]{display:none}
-.wp-toggle{display:flex;align-items:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);cursor:pointer}
-.wp-toggle input{width:18px;height:18px;flex:none;accent-color:var(--ac);cursor:pointer}
+.wp-actions .wp-remove:disabled{opacity:.4;cursor:not-allowed}
+.wp-toggle{display:flex;align-items:center;gap:12px;margin-top:12px;cursor:pointer}
+.wp-toggle.sect{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+/* round check, same look as the task card's done checkbox */
+.wp-toggle input{appearance:none;-webkit-appearance:none;flex:none;width:16px;height:16px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 1.5px var(--mute);cursor:pointer;display:grid;place-content:center;transition:background-color .15s,box-shadow .15s}
+.wp-toggle input::after{content:"";width:8px;height:4px;border:solid var(--acx);border-width:0 0 2px 2px;transform:rotate(-45deg) translate(1px,-1px);opacity:0}
+.wp-toggle input:checked{background:var(--ac);box-shadow:inset 0 0 0 1.5px var(--ac)}
+.wp-toggle input:checked::after{opacity:1}
+.wp-toggle:hover input:not(:checked){box-shadow:inset 0 0 0 1.5px var(--ac)}
+.wp-toggle input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .wp-toggle span{display:flex;flex-direction:column}
 .wp-toggle b{font-size:14px;font-weight:600}
 .wp-toggle small{font-size:12px;color:var(--mute)}
-.wp-toggle+.wp-toggle{margin-top:10px;padding-top:0;border-top:0}
 .wp-zoom output{min-width:38px;text-align:right;font-size:13px;color:var(--mute)}
 
 /* Translucent stages and cards: --pa is the opacity of the surface color */
@@ -270,3 +305,50 @@ box-shadow:0 1px 3px rgba(0,0,0,.18)}
 [data-glass-lanes=on] .add-lane{background:color-mix(in srgb,var(--sf) var(--pa,55%),transparent)}
 [data-glass-cards=on] .task-card:not(.is-placeholder){background:color-mix(in srgb,var(--sf2) var(--pa,55%),transparent)}
 [data-glass-cards=on] .task-card.colored:not(.is-placeholder){background:color-mix(in srgb,color-mix(in srgb,var(--tc) 30%,var(--sf2)) var(--pa,55%),transparent)}
+
+/* Sidebar: icons, two-line items, segmented controls, switch */
+.rail-item .ic{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.rail-item.two{align-items:center;gap:10px}
+.rail .g b{display:block;font-weight:inherit;overflow:hidden;text-overflow:ellipsis}
+.rail .g small{display:block;font-size:12px;line-height:1.3;opacity:.55;white-space:normal}
+.rail-item.two .g{white-space:normal}
+.ctl{padding:6px 10px 8px}
+.ctl-label{font-size:13px;font-weight:600;margin-bottom:6px}
+.ctl-hint{margin-top:5px;font-size:12px;line-height:1.3;opacity:.55}
+.seg{display:flex;gap:2px;padding:3px;border-radius:9px;background:rgba(255,255,255,.08)}
+.seg button{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;padding:6px 2px;border-radius:7px;font-size:12.5px;font-weight:600;color:rgba(220,227,245,.72);white-space:nowrap}
+.seg button:hover{color:#fff;background:rgba(255,255,255,.07)}
+.seg button[aria-pressed=true]{background:var(--ac);color:var(--acx)}
+.seg .ic{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ctl-row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.ctl-row .g{flex:1;min-width:0;font-size:13px;font-weight:600}
+.ctl-row .g small{font-weight:400}
+.switch{position:relative;flex:none;width:38px;height:22px;border-radius:999px;background:rgba(255,255,255,.22);transition:background .18s}
+.switch i{position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .18s}
+.switch[aria-checked=true]{background:var(--ac)}
+.switch[aria-checked=true] i{transform:translateX(16px)}
+
+/* Header bar: archive icon buttons */
+.bar-actions{display:flex;gap:8px}
+.icon-btn{position:relative;width:38px;height:38px;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:var(--sf2);color:var(--ink)}
+.icon-btn svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn:hover{border-color:var(--ac);color:var(--ac)}
+.icon-btn.is-idle{color:var(--mute);opacity:.7}
+.icon-btn .badge{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 5px;display:grid;place-items:center;border-radius:999px;background:var(--ac);color:var(--acx);font-size:11px;font-weight:700;line-height:1}
+.icon-btn .badge[hidden]{display:none}
+[data-header=blur] .icon-btn{background:color-mix(in srgb,var(--sf2) 55%,transparent)}
+
+/* Panels that open next to what was clicked (board manager, stage and task editors) */
+.modal.anchored{background:rgba(8,12,20,.3)}
+#task-modal.anchored .modal-content,#column-modal.anchored .modal-content,#board-manager-modal.anchored .modal-content{position:fixed;left:0;top:0;width:min(460px,calc(100vw - 24px));height:auto;max-height:calc(100vh - 24px);border-width:1px;border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.4);animation:pop .16s ease-out}
+@keyframes pop{from{transform:translateY(6px) scale(.97);opacity:0}}
+
+/* Segmented control on a light surface (task priority) */
+.seg-form{background:var(--sf2);border:1px solid var(--line)}
+.seg-form button{padding:8px 2px;color:var(--mute)}
+.seg-form button:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 7%,transparent)}
+.seg-form button[aria-pressed=true]{background:var(--ac);color:var(--acx)}
+.btn-danger-outline{color:#E03131}
+#board-manager-modal.anchored .modal-content{width:min(520px,calc(100vw - 24px))}
+.board-item-right{flex:none}
+.board-item-right :is(.board-save-status,.board-stats){white-space:nowrap}

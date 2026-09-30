@@ -3,11 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kanvu – Task Management Tool</title>
+
+    <title>Kanvu – Customizable Kanban Task Management Tool</title>
+    <meta name="description" content="Kanvu is a simple and customizable Kanban task management tool that helps you organize and visualize your work your way.">
+    <meta name="keywords" content="Kanban, task management, task management tool, Kanban board, productivity, project management">
+
+    <meta property="og:title" content="Kanvu – Customizable Kanban Task Management Tool">
+    <meta property="og:description" content="A simple and customizable Kanban task management tool to organize and visualize your work your way.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://kanvu.vercel.app/">
+    <meta property="og:image" content="https://kanvu.vercel.app/og-image.png">
+
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="black" data-view="columns" data-header="solid" data-glass-lanes="off" data-glass-cards="off">
@@ -26,13 +38,41 @@
         </section>
         <section>
             <div class="rail-head"><h3>Display</h3></div>
-            <button class="rail-item" id="theme-button" onclick="kanban.cycleTheme()"><span class="g">Theme</span><em class="v"></em></button>
-            <button class="rail-item" id="density-button" onclick="kanban.cycleDensity()"><span class="g">Detail</span><em class="v"></em></button>
-            <button class="rail-item" id="layout-button" onclick="kanban.cycleColumnLayout()"><span class="g">Card size</span><em class="v"></em></button>
-            <button class="rail-item" id="wallpaper-button" onclick="kanban.openWallpaperModal()"><span class="g">Wallpaper</span><em class="v"></em></button>
-            <button class="rail-item" id="autosave-button" onclick="kanban.toggleAutosave()"><span class="g">Autosave</span><em class="v"></em></button>
-            <button class="rail-item" onclick="kanban.exportBoard()"><span class="g">Export board</span></button>
-            <button class="rail-item" onclick="kanban.importBoard()"><span class="g">Import board</span></button>
+            <div class="ctl">
+                <div class="ctl-label">Theme</div>
+                <div class="seg" role="group" aria-label="Theme">
+                    <button type="button" data-theme-opt="white" aria-pressed="false" onclick="kanban.setTheme('white')" title="Light theme"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.2"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"/></svg><span>Light</span></button>
+                    <button type="button" data-theme-opt="grey" aria-pressed="false" onclick="kanban.setTheme('grey')" title="Dusk theme (soft grey)"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="M10 3.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg><span>Dusk</span></button>
+                    <button type="button" data-theme-opt="black" aria-pressed="false" onclick="kanban.setTheme('black')" title="Dark theme"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M16.5 11.5A6.5 6.5 0 0 1 8.5 3.5a6.5 6.5 0 1 0 8 8z"/></svg><span>Dark</span></button>
+                </div>
+            </div>
+            <div class="ctl">
+                <div class="ctl-label">Card detail</div>
+                <div class="seg" role="group" aria-label="Card detail">
+                    <button type="button" data-density-opt="comfortable" aria-pressed="false" onclick="kanban.setDensity('comfortable')" title="Comfortable: full card details">Comfy</button>
+                    <button type="button" data-density-opt="compact" aria-pressed="false" onclick="kanban.setDensity('compact')" title="Compact: smaller cards, shorter notes">Compact</button>
+                    <button type="button" data-density-opt="dense" aria-pressed="false" onclick="kanban.setDensity('dense')" title="Dense: titles only">Dense</button>
+                </div>
+                <div class="ctl-hint" id="density-hint"></div>
+            </div>
+            <div class="ctl">
+                <div class="ctl-label" id="layout-label">Columns per row</div>
+                <div class="seg" role="group" aria-labelledby="layout-label" id="layout-seg">
+                    <button type="button" data-cols-opt="3" aria-pressed="false" onclick="kanban.setColumnLayout(3)"></button>
+                    <button type="button" data-cols-opt="4" aria-pressed="false" onclick="kanban.setColumnLayout(4)"></button>
+                    <button type="button" data-cols-opt="5" aria-pressed="false" onclick="kanban.setColumnLayout(5)"></button>
+                </div>
+            </div>
+            <div class="ctl ctl-row">
+                <span class="g"><b>Autosave</b><small id="autosave-hint"></small></span>
+                <button type="button" class="switch" id="autosave-button" role="switch" aria-checked="false" aria-label="Autosave" onclick="kanban.toggleAutosave()"><i></i></button>
+            </div>
+            <button class="rail-item two" id="wallpaper-button" onclick="kanban.openWallpaperModal()"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><circle cx="7" cy="8" r="1.3"/><path d="M3 15l4.5-4.5 3 3 2-2 4.5 4"/></svg><span class="g"><b>Wallpaper</b><small>Image, blur and transparency</small></span><em class="v"></em></button>
+        </section>
+        <section>
+            <div class="rail-head"><h3>Data</h3></div>
+            <button class="rail-item two" onclick="kanban.exportBoard()" title="Download this board as a JSON backup"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9M6.5 8.5L10 12l3.5-3.5M3.5 14.5v1a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-1"/></svg><span class="g"><b>Export board</b></span></button>
+            <button class="rail-item two" onclick="kanban.importBoard()" title="Load a board from a JSON file"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 12V3M6.5 6.5L10 3l3.5 3.5M3.5 14.5v1a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-1"/></svg><span class="g"><b>Import board</b></span></button>
         </section>
         <footer class="rail-foot">Copyright © 2026 Marco Christian.</footer>
     </aside>
@@ -51,13 +91,21 @@
                 </button>
             </div>
             <input type="search" class="find" id="search-input" placeholder="Find a task" aria-label="Find a task">
+            <div class="bar-actions">
+                <button type="button" class="icon-btn" id="archive-done-button" onclick="kanban.archiveAllDone()" title="Archive all done tasks" aria-label="Archive all done tasks">
+                    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="16" height="4" rx="1"/><path d="M3.5 7v8A1.5 1.5 0 0 0 5 16.5h10a1.5 1.5 0 0 0 1.5-1.5V7"/><path d="M7.5 11.5l2 2 3.5-3.5"/></svg><span class="badge" hidden></span>
+                </button>
+                <button type="button" class="icon-btn" id="archived-button" onclick="kanban.openArchiveModal()" title="Archived cards" aria-label="Archived cards">
+                    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="16" height="4" rx="1"/><path d="M3.5 7v8A1.5 1.5 0 0 0 5 16.5h10a1.5 1.5 0 0 0 1.5-1.5V7"/><path d="M8 11h4"/></svg><span class="badge" hidden></span>
+                </button>
+            </div>
             <button class="btn" id="save-button" onclick="kanban.saveToStorage()">Save</button>
         </header>
         <main class="board"></main>
     </div>
 </div>
 
-<div id="task-modal" class="modal">
+<div id="task-modal" class="modal anchored">
     <div class="modal-content">
         <div class="modal-header">
             <h2 class="modal-title" id="modal-title">New task</h2>
@@ -69,12 +117,13 @@
                 <textarea class="form-textarea" id="task-description" rows="3" maxlength="500" placeholder="Notes" aria-label="Notes"></textarea>
             </div>
             <div class="form-group">
-                <label class="form-label" for="task-priority">Priority</label>
-                <select class="form-select" id="task-priority">
-                    <option value="low">Low</option>
-                    <option value="medium" selected>Medium</option>
-                    <option value="high">High</option>
-                </select>
+                <span class="form-label" id="task-priority-label">Priority</span>
+                <div class="seg seg-form" role="group" aria-labelledby="task-priority-label" id="task-priority-seg">
+                    <button type="button" data-prio-opt="low" aria-pressed="false" onclick="kanban.setTaskPriority('low')">Low</button>
+                    <button type="button" data-prio-opt="medium" aria-pressed="true" onclick="kanban.setTaskPriority('medium')">Medium</button>
+                    <button type="button" data-prio-opt="high" aria-pressed="false" onclick="kanban.setTaskPriority('high')">High</button>
+                </div>
+                <input type="hidden" id="task-priority" value="medium">
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -121,17 +170,22 @@
         <p class="wp-hint" id="wp-hint"></p>
         <div class="wp-frame" id="wp-frame">
             <img id="wp-img" alt="" draggable="false">
-            <div class="wp-empty" id="wp-empty">No image yet.<br>Choose one to crop it to the board area.</div>
+            <div class="wp-empty" id="wp-empty">No image yet.<br>Click here to choose one and crop it to the board area.</div>
         </div>
         <div class="wp-zoom" id="wp-zoom-row">
             <label for="wp-zoom">Zoom</label>
             <input type="range" class="slider" id="wp-zoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
         </div>
-        <label class="wp-toggle" for="header-blur-toggle">
+        <label class="wp-toggle sect" for="header-blur-toggle">
             <input type="checkbox" id="header-blur-toggle" onchange="kanban.setHeaderBlur(this.checked)">
             <span><b>Blurry header bar</b><small>Semi-transparent with a frosted-glass blur</small></span>
         </label>
-        <label class="wp-toggle" for="glass-lanes-toggle">
+        <div class="wp-zoom" id="header-blur-row">
+            <label for="header-blur-amount">Header blur</label>
+            <input type="range" class="slider" id="header-blur-amount" min="0" max="30" step="1" value="16" aria-label="Blur amount for the header bar" oninput="kanban.setGlassBlur('header', this.value)">
+            <output id="header-blur-val">16px</output>
+        </div>
+        <label class="wp-toggle sect" for="glass-lanes-toggle">
             <input type="checkbox" id="glass-lanes-toggle" onchange="kanban.setGlass('lanes', this.checked)">
             <span><b>Translucent stages</b><small>Lets the wallpaper show through the stage panels</small></span>
         </label>
@@ -143,11 +197,6 @@
             <label for="glass-opacity">Opacity</label>
             <input type="range" class="slider" id="glass-opacity" min="20" max="95" step="1" value="55" aria-label="Panel and card opacity" oninput="kanban.setGlassOpacity(this.value)">
             <output id="glass-opacity-val">55%</output>
-        </div>
-        <div class="wp-zoom" id="header-blur-row">
-            <label for="header-blur-amount">Header blur</label>
-            <input type="range" class="slider" id="header-blur-amount" min="0" max="30" step="1" value="16" aria-label="Blur amount for the header bar" oninput="kanban.setGlassBlur('header', this.value)">
-            <output id="header-blur-val">16px</output>
         </div>
         <div class="wp-zoom" id="stage-blur-row">
             <label for="stage-blur-amount">Stage blur</label>

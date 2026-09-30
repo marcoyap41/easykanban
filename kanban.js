@@ -89,6 +89,15 @@ class Kanvu {
             display.textContent = `${value}%`;
         });
 
+        // Remember what was clicked last, so edit panels can open right next to it
+        document.addEventListener('click', (e) => {
+            this._clickEl = e.target;
+            this._clickAt = Date.now();
+        }, true);
+        window.addEventListener('resize', () => {
+            document.querySelectorAll('.modal.anchored.show').forEach(m => this.positionAnchored(m));
+        });
+
         // Drag and drop (mouse, pen and touch share one pointer-based implementation)
         this.initializeDragAndDrop();
 
@@ -153,34 +162,15 @@ class Kanvu {
         this.currentTheme = theme;
     }
 
-    cycleTheme() {
-        const themes = ['white', 'grey', 'black'];
-        const currentIndex = themes.indexOf(this.currentTheme);
-        const nextIndex = (currentIndex + 1) % themes.length;
-        const nextTheme = themes[nextIndex];
-        
-        this.changeTheme(nextTheme);
+    setTheme(theme) {
+        this.changeTheme(theme);
         this.updateThemeButton();
     }
 
     updateThemeButton() {
-        const button = document.getElementById('theme-button');
-        const themeEmojis = {
-            'white': '☀️',  // Sun for light theme
-            'grey': '🌓',   // Half moon for warm/grey theme  
-            'black': '🌙'   // Moon for dark theme
-        };
-        
-        const themeNames = {
-            'white': 'Light Theme',
-            'grey': 'Dusk Theme',
-            'black': 'Dark Theme'
-        };
-        
-        if (button) {
-            button.querySelector('.v').textContent = themeNames[this.currentTheme].replace(' Theme', '');
-            button.title = `Current: ${themeNames[this.currentTheme]} - Click to change`;
-        }
+        document.querySelectorAll('[data-theme-opt]').forEach(btn => {
+            btn.setAttribute('aria-pressed', btn.dataset.themeOpt === this.currentTheme ? 'true' : 'false');
+        });
     }
 
     // Density Management
@@ -190,34 +180,22 @@ class Kanvu {
         this.currentDensity = density;
     }
 
-    cycleDensity() {
-        const densities = ['comfortable', 'compact', 'dense'];
-        const currentIndex = densities.indexOf(this.currentDensity);
-        const nextIndex = (currentIndex + 1) % densities.length;
-        const nextDensity = densities[nextIndex];
-        
-        this.changeDensity(nextDensity);
+    setDensity(density) {
+        this.changeDensity(density);
         this.updateDensityButton();
     }
 
     updateDensityButton() {
-        const button = document.getElementById('density-button');
-        const densityEmojis = {
-            'comfortable': '📋',  // Clipboard for comfortable (full details)
-            'compact': '📄',      // Page for compact (some details)
-            'dense': '📝'         // Memo for dense (minimal details)
+        const hints = {
+            comfortable: 'Full cards: notes, difficulty, progress',
+            compact: 'Smaller cards with shorter notes',
+            dense: 'Titles only, most cards on screen'
         };
-        
-        const densityNames = {
-            'comfortable': 'Comfortable View',
-            'compact': 'Compact View', 
-            'dense': 'Dense View'
-        };
-        
-        if (button) {
-            button.querySelector('.v').textContent = densityNames[this.currentDensity].replace(' View', '');
-            button.title = `Current: ${densityNames[this.currentDensity]} - Click to change`;
-        }
+        document.querySelectorAll('[data-density-opt]').forEach(btn => {
+            btn.setAttribute('aria-pressed', btn.dataset.densityOpt === this.currentDensity ? 'true' : 'false');
+        });
+        const hint = document.getElementById('density-hint');
+        if (hint) hint.textContent = hints[this.currentDensity] || '';
     }
 
     // Board Layout Mode
@@ -232,12 +210,6 @@ class Kanvu {
         if (rerender) this.renderBoard();
     }
 
-    goToLane(id) {
-        document.body.classList.remove('rail-open');
-        const el = document.getElementById(`lane-${id}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: this.currentView === 'columns' ? 'nearest' : 'start', inline: 'center' });
-    }
-
     // Column Layout Management
     changeColumnLayout(layout) {
         document.body.setAttribute('data-columns', layout);
@@ -245,24 +217,22 @@ class Kanvu {
         this.currentColumnLayout = layout;
     }
 
-    cycleColumnLayout() {
-        const layouts = [3, 4, 5];
-        const currentIndex = layouts.indexOf(this.currentColumnLayout);
-        const nextIndex = (currentIndex + 1) % layouts.length;
-        const nextLayout = layouts[nextIndex];
-        
-        this.changeColumnLayout(nextLayout);
+    setColumnLayout(layout) {
+        this.changeColumnLayout(Number(layout));
         this.updateLayoutButton();
     }
 
     updateLayoutButton() {
-        const button = document.getElementById('layout-button');
-        if (!button) return;
         const cols = this.currentView === 'columns';
-        const names = cols ? { 3: '3 across', 4: '4 across', 5: '5 across' } : { 3: 'Wide', 4: 'Medium', 5: 'Narrow' };
-        button.querySelector('.g').textContent = cols ? 'Columns shown' : 'Card size';
-        button.querySelector('.v').textContent = names[this.currentColumnLayout];
-        button.title = `Current: ${names[this.currentColumnLayout]} - Click to change`;
+        const names = cols ? { 3: '3', 4: '4', 5: '5' } : { 3: 'Wide', 4: 'Medium', 5: 'Narrow' };
+        const label = document.getElementById('layout-label');
+        if (label) label.textContent = cols ? 'Columns per row' : 'Card width';
+        document.querySelectorAll('[data-cols-opt]').forEach(btn => {
+            const n = Number(btn.dataset.colsOpt);
+            btn.textContent = names[n];
+            btn.title = cols ? `${n} columns per row` : `${names[n]} cards`;
+            btn.setAttribute('aria-pressed', n === Number(this.currentColumnLayout) ? 'true' : 'false');
+        });
     }
 
     // Appearance: header blur + custom wallpaper
@@ -381,7 +351,7 @@ class Kanvu {
         const btn = document.getElementById('wallpaper-button');
         if (!btn) return;
         btn.querySelector('.v').textContent = this.wallpaperBlob ? 'Custom' : 'Default';
-        btn.title = 'Wallpaper and header bar style';
+        btn.title = 'Wallpaper, header bar and translucency settings';
     }
 
     initWallpaperModal() {
@@ -426,6 +396,24 @@ class Kanvu {
         document.getElementById('wp-zoom').addEventListener('input', (e) => {
             if (this.wp && this.wp.editable) this.wpSetZoom(parseFloat(e.target.value));
         });
+
+        // Empty crop box doubles as a "choose image" button
+        const pick = () => document.getElementById('wp-file').click();
+        frame.addEventListener('click', () => { if (!frame.classList.contains('has-img')) pick(); });
+        frame.addEventListener('keydown', (e) => {
+            if (frame.classList.contains('has-img') || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            pick();
+        });
+    }
+
+    // Empty crop box is clickable; Remove is only usable while an image is shown in the box
+    wpSyncUi() {
+        const frame = document.getElementById('wp-frame');
+        const has = frame.classList.contains('has-img');
+        if (has) { frame.removeAttribute('tabindex'); frame.removeAttribute('role'); frame.removeAttribute('aria-label'); }
+        else { frame.setAttribute('tabindex', '0'); frame.setAttribute('role', 'button'); frame.setAttribute('aria-label', 'Choose an image'); }
+        document.getElementById('wp-remove').disabled = !has;
     }
 
     openWallpaperModal() {
@@ -441,11 +429,11 @@ class Kanvu {
         frame.style.setProperty('--wp-ratio', ratio);
         document.getElementById('wp-hint').textContent =
             `The frame matches your board area (${this.wp.boxW} × ${this.wp.boxH} px, ${ratio.toFixed(2)}:1). Drag to move, scroll or use the slider to zoom.`;
-        document.getElementById('wp-remove').hidden = !this.wallpaperBlob;
         document.getElementById('wp-choose').textContent = this.wallpaperBlob ? 'Change image' : 'Choose image';
         document.getElementById('wp-apply').disabled = true;
         document.getElementById('wp-zoom-row').classList.add('hidden');
 
+        this.wpSyncUi();
         document.getElementById('wallpaper-modal').classList.add('show');
 
         if (this.wallpaperUrl) {
@@ -470,6 +458,7 @@ class Kanvu {
         if (img) img.removeAttribute('src');
         const file = document.getElementById('wp-file');
         if (file) file.value = '';
+        if (frame) this.wpSyncUi();
     }
 
     wpLoadImage(url) {
@@ -524,6 +513,7 @@ class Kanvu {
         document.getElementById('wp-zoom').value = 1;
         document.getElementById('wp-zoom-row').classList.toggle('hidden', !editable);
         document.getElementById('wp-apply').disabled = !editable;
+        this.wpSyncUi();
         this.wpRender();
     }
 
@@ -574,7 +564,34 @@ class Kanvu {
         }
     }
 
+    // A newly chosen (not yet applied) image is simply discarded; the saved wallpaper, if any, shows again
+    wpDiscardPending() {
+        const wp = this.wp;
+        if (this._wpTempUrl) { URL.revokeObjectURL(this._wpTempUrl); this._wpTempUrl = null; }
+        const file = document.getElementById('wp-file');
+        if (file) file.value = '';
+        const frame = document.getElementById('wp-frame');
+        const img = document.getElementById('wp-img');
+        frame.classList.remove('has-img', 'editable', 'dragging');
+        img.removeAttribute('src');
+        wp.img = null;
+        wp.editable = false;
+        wp.zoom = 1;
+        document.getElementById('wp-zoom').value = 1;
+        document.getElementById('wp-zoom-row').classList.add('hidden');
+        document.getElementById('wp-apply').disabled = true;
+        this.wpSyncUi();
+        if (this.wallpaperUrl) {
+            this.wpLoadImage(this.wallpaperUrl).then((im) => {
+                if (this.wp === wp && !wp.img) this.wpShowImage(im, false);
+            }).catch(() => {});
+        }
+    }
+
     async removeWallpaper() {
+        const wp = this.wp;
+        if (!wp || !wp.img) return; // nothing selected, nothing to remove
+        if (wp.editable) { this.wpDiscardPending(); return; }
         try {
             await this.wpStore('readwrite', st => st.delete('wallpaper'));
         } catch (e) {
@@ -947,8 +964,10 @@ class Kanvu {
     updateAutosaveButton() {
         const button = document.getElementById('autosave-button');
         if (!button) return;
-        button.querySelector('.v').textContent = this.autosaveEnabled ? 'On' : 'Off';
-        button.title = `Autosave is ${this.autosaveEnabled ? 'on' : 'off'} - Click to change`;
+        button.setAttribute('aria-checked', this.autosaveEnabled ? 'true' : 'false');
+        button.title = this.autosaveEnabled ? 'Autosave is on. Click to turn off' : 'Autosave is off. Click to turn on';
+        const hint = document.getElementById('autosave-hint');
+        if (hint) hint.textContent = this.autosaveEnabled ? 'Saves changes for you' : 'Off: use the Save button';
     }
 
     // Other tabs write to localStorage, this tab gets a 'storage' event
@@ -1036,7 +1055,7 @@ class Kanvu {
         return ok;
     }
 
-    loadBoard(boardId) {
+    loadBoard(boardId, quiet = false) {
         const board = this.savedBoards[boardId];
         if (board) {
             this.currentBoardId = boardId;
@@ -1055,7 +1074,7 @@ class Kanvu {
             // Update UI
             document.getElementById('board-name').value = this.currentBoardName;
             this.renderBoard();
-            this.showToast(`Loaded board: ${board.name}`, 'success');
+            if (!quiet) this.showToast(`Loaded board: ${board.name}`, 'success');
         }
     }
 
@@ -1156,13 +1175,59 @@ class Kanvu {
         });
     }
 
+    // ---- Panels that open next to what was clicked ----
+    // Edit panels used to slide in from the far edge of the screen, which is a long way from
+    // the sidebar button or the card being edited. They now sit beside the thing that opened them.
+    recentClickEl() {
+        const el = this._clickEl;
+        return el && el.isConnected && Date.now() - (this._clickAt || 0) < 1000 ? el : null;
+    }
+
+    showAnchoredModal(modal, anchor, opts = {}) {
+        modal._anchor = anchor || null;
+        modal._anchorOpts = opts;
+        modal.classList.add('show');
+        this.positionAnchored(modal);
+    }
+
+    positionAnchored(modal) {
+        if (!modal || !modal.classList.contains('show')) return;
+        const box = modal.querySelector('.modal-content');
+        if (!box) return;
+        const anchor = modal._anchor && modal._anchor.isConnected ? modal._anchor : null;
+        const opts = modal._anchorOpts || {};
+        const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+        const margin = 12, gap = 10;
+        const w = box.offsetWidth, h = box.offsetHeight;
+        let left = (vw - w) / 2, top = (vh - h) / 2; // no anchor: centered
+        if (anchor) {
+            const r = anchor.getBoundingClientRect();
+            const ref = opts.alignTo && opts.alignTo.isConnected ? opts.alignTo.getBoundingClientRect() : r;
+            if (r.right + gap + w <= vw - margin) left = r.right + gap;        // beside it, to the right
+            else if (r.left - gap - w >= margin) left = r.left - gap - w;      // otherwise to the left
+            else left = r.left + r.width / 2 - w / 2;                          // otherwise over it
+            top = ref.top;
+        }
+        box.style.left = Math.max(margin, Math.min(left, vw - w - margin)) + 'px';
+        box.style.top = Math.max(margin, Math.min(top, vh - h - margin)) + 'px';
+    }
+
+    defaultColumns() {
+        return [
+            { id: 'backlog', title: 'Backlog', order: 0, color: '#a855f7' },
+            { id: 'todo', title: 'To Do', order: 1, color: '#ef4444' },
+            { id: 'in-progress', title: 'In Progress', order: 2, color: '#eab308' },
+            { id: 'done', title: 'Done', order: 3, color: '#22c55e' }
+        ];
+    }
+
     // ---- Board manager ----
     openBoardManager() {
         let modal = document.getElementById('board-manager-modal');
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'board-manager-modal';
-            modal.className = 'modal';
+            modal.className = 'modal anchored';
             modal.innerHTML = `
                 <div class="modal-content modal-compact">
                     <div class="modal-header">
@@ -1173,6 +1238,7 @@ class Kanvu {
                         <div class="board-actions-row">
                             <button class="btn btn-sm" onclick="kanban.createNewBoard()">New board</button>
                             <button class="btn btn-sm btn-secondary" onclick="kanban.duplicateCurrentBoard()">Duplicate board</button>
+                            <button class="btn btn-sm btn-secondary btn-danger-outline" onclick="kanban.deleteBoard(kanban.currentBoardId)" title="Move the board that is open now to the trash">Delete this board</button>
                         </div>
                         <div class="boards-list-compact" id="saved-boards-list-compact"></div>
                         <div id="board-trash"></div>
@@ -1183,7 +1249,8 @@ class Kanvu {
             this.initBoardDrag(modal);
         }
         this.refreshBoardManager();
-        modal.classList.add('show');
+        // Open beside the sidebar, level with the Manage button that was pressed
+        this.showAnchoredModal(modal, document.getElementById('rail'), { alignTo: document.querySelector('.rail-head .link') });
     }
 
     refreshBoardManager() {
@@ -1191,6 +1258,7 @@ class Kanvu {
         if (!modal) return;
         modal.querySelector('#saved-boards-list-compact').innerHTML = this.renderCompactBoardsList();
         modal.querySelector('#board-trash').innerHTML = this.renderTrashSection();
+        this.positionAnchored(modal); // the list may have grown or shrunk
     }
 
     // Drag a board row to reorder (buttons do the same for touch / keyboard)
@@ -1312,8 +1380,8 @@ class Kanvu {
                         <button class="btn-compact btn-move" onclick="kanban.moveBoard('${boardId}', 1)" ${i === ids.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move down">▼</button>
                         ${cur
                             ? `<span class="board-save-status">${this.getCompactSaveInfo()}</span>`
-                            : `<button class="btn-compact" onclick="kanban.switchToBoard('${boardId}')" title="Open">Open</button>
-                               <button class="btn-compact btn-danger" onclick="kanban.deleteBoard('${boardId}')" title="Move to trash">×</button>`}
+                            : `<button class="btn-compact" onclick="kanban.switchToBoard('${boardId}')" title="Open">Open</button>`}
+                        <button class="btn-compact btn-danger" onclick="kanban.deleteBoard('${boardId}')" title="Move to trash" aria-label="Move to trash">×</button>
                     </div>
                 </div>
             `;
@@ -1427,27 +1495,50 @@ class Kanvu {
     }
 
     deleteBoard(boardId) {
-        const board = this.savedBoards[boardId];
-        if (!board) return;
-        
-        // Don't delete the current board
-        if (boardId === this.currentBoardId) {
-            this.showToast('Cannot delete the current board', 'error');
-            return;
-        }
-        
-        this.showConfirmDialog('Move to trash', `Move the board "${board.name}" to the trash?\n\nYou can restore it later from Manage boards > Trash.`, (confirmed) => {
-            if (confirmed) {
-                // Copy to trash first, so a failed write can never lose the board
-                const trash = this.readTrash();
-                trash[boardId] = { ...board, deletedAt: new Date().toISOString() };
-                if (!this.writeTrash(trash)) return;
-                
-                delete this.savedBoards[boardId];
-                this.saveBoardsToStorage([], [boardId]);
-                this.refreshBoardManager();
-                this.showToast(`Moved to trash: ${board.name}`, 'info');
+        const stored = this.savedBoards[boardId];
+        if (!stored) return;
+        const isCurrent = boardId === this.currentBoardId;
+        // The open board goes to the trash exactly as it is right now, unsaved edits included
+        const board = isCurrent
+            ? { ...stored, id: boardId, name: this.currentBoardName, tasks: this.tasks, columns: this.columns, lastModified: new Date().toISOString() }
+            : stored;
+        const message = isCurrent
+            ? `Move the current board "${board.name}" to the trash?\n\nAnother board will open in its place. You can restore this one later from Manage boards > Trash.`
+            : `Move the board "${board.name}" to the trash?\n\nYou can restore it later from Manage boards > Trash.`;
+
+        this.showConfirmDialog('Move to trash', message, (confirmed) => {
+            if (!confirmed) return;
+            // Copy to trash first, so a failed write can never lose the board
+            const trash = this.readTrash();
+            trash[boardId] = { ...board, deletedAt: new Date().toISOString() };
+            if (!this.writeTrash(trash)) return;
+
+            // Which board takes over: the one after it in the list, else the one before, else a fresh one
+            let nextId = null;
+            if (isCurrent) {
+                const ids = this.getOrderedBoardIds();
+                const i = ids.indexOf(boardId);
+                nextId = ids[i + 1] || ids[i - 1] || null;
             }
+            delete this.savedBoards[boardId];
+            const changed = [];
+            if (isCurrent && !nextId) {
+                const now = new Date().toISOString();
+                nextId = this.generateBoardId('My Projects');
+                this.savedBoards[nextId] = { id: nextId, name: 'My Projects', tasks: [], columns: this.defaultColumns(), lastModified: now, createdAt: now };
+                changed.push(nextId);
+            }
+            if (!this.saveBoardsToStorage(changed, [boardId])) {
+                this.savedBoards[boardId] = stored; // keep it if the write failed
+                if (changed.length) delete this.savedBoards[nextId];
+                return;
+            }
+            if (isCurrent) this.loadBoard(nextId, true);
+            this.refreshBoardManager();
+            this.renderRail();
+            this.showToast(isCurrent
+                ? `Moved to trash: ${board.name}. Opened ${this.currentBoardName}`
+                : `Moved to trash: ${board.name}`, 'info');
         });
     }
 
@@ -1469,7 +1560,7 @@ class Kanvu {
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'column-modal';
-            modal.className = 'modal';
+            modal.className = 'modal anchored';
             modal.innerHTML = `
                 <div class="modal-content">
                     <div class="modal-header">
@@ -1527,6 +1618,10 @@ class Kanvu {
         }
 
         this.currentColumnId = columnId;
+        // Editing: beside the stage header. Adding: beside the "Add a stage" button
+        const anchor = columnId
+            ? document.querySelector(`.column[data-column="${CSS.escape(columnId)}"] .lane-head`)
+            : this.recentClickEl();
         const title = document.getElementById('column-modal-title');
         const form = document.getElementById('column-form');
 
@@ -1546,7 +1641,9 @@ class Kanvu {
             this.updateColumnColorPickerSelection('');
         }
 
-        modal.classList.add('show');
+        this.showAnchoredModal(modal, anchor);
+        const nameField = document.getElementById('column-title');
+        if (nameField) nameField.focus();
     }
 
     closeColumnModal() {
@@ -1935,6 +2032,10 @@ class Kanvu {
         const modal = document.getElementById('task-modal');
         const title = document.getElementById('modal-title');
         const form = document.getElementById('task-form');
+        // Editing: beside the card. Adding: beside the "Add card" button
+        const anchor = taskId
+            ? document.querySelector(`.task-card[data-task-id="${CSS.escape(taskId)}"]`)
+            : this.recentClickEl();
         
         if (taskId) {
             const task = this.tasks.find(t => t.id === taskId);
@@ -1951,9 +2052,19 @@ class Kanvu {
             // Reset color to no color
             document.getElementById('task-color').value = '';
             this.updateColorPickerSelection('');
+            this.setTaskPriority('medium');
         }
         
-        modal.classList.add('show');
+        this.showAnchoredModal(modal, anchor);
+    }
+
+    // Priority is a three-way toggle (same look as the sidebar toggles); the hidden input keeps the value
+    setTaskPriority(value) {
+        if (!['low', 'medium', 'high'].includes(value)) value = 'medium';
+        document.getElementById('task-priority').value = value;
+        document.querySelectorAll('#task-priority-seg [data-prio-opt]').forEach(btn => {
+            btn.setAttribute('aria-pressed', btn.dataset.prioOpt === value ? 'true' : 'false');
+        });
     }
 
     populateTaskForm(task) {
@@ -1970,7 +2081,7 @@ class Kanvu {
         difficultySlider.nextElementSibling.textContent = `${task.difficulty || 3} / 5`;
         progressSlider.nextElementSibling.textContent = `${task.progress || 0}%`;
         
-        document.getElementById('task-priority').value = task.priority || 'medium';
+        this.setTaskPriority(task.priority || 'medium');
         
         // Set task color
         const color = (task.color === undefined || task.color === null) ? '#3b82f6' : task.color;
@@ -2005,8 +2116,14 @@ class Kanvu {
             const index = this.tasks.findIndex(t => t.id === this.currentTaskId);
             if (index !== -1) {
                 // Preserve the column if editing
-                taskData.column = this.tasks[index].column;
-                if (this.tasks[index].order !== undefined) taskData.order = this.tasks[index].order;
+                const old = this.tasks[index];
+                taskData.column = old.column;
+                if (old.order !== undefined) taskData.order = old.order;
+                // Keep the done state unless the progress slider was moved off 100%
+                if (old.done && taskData.progress === 100) {
+                    taskData.done = true;
+                    if (old.prevProgress !== undefined) taskData.prevProgress = old.prevProgress;
+                }
                 this.tasks[index] = taskData;
             }
         } else {
@@ -2043,7 +2160,7 @@ class Kanvu {
     }
 
     sortedTasksInColumn(columnId) {
-        return this.tasks.filter(t => t.column === columnId).sort((a, b) => this.compareTasks(a, b));
+        return this.tasks.filter(t => t.column === columnId && !t.archived).sort((a, b) => this.compareTasks(a, b));
     }
 
     moveTask(taskId, newColumn, beforeTaskId = null) {
@@ -2064,23 +2181,6 @@ class Kanvu {
         if (changedColumn) {
             task.column = newColumn;
             task.updatedAt = new Date().toISOString();
-
-            // Auto-update progress based on column name patterns
-            const newColumnTitle = this.columns.find(c => c.id === newColumn)?.title.toLowerCase() || '';
-            const oldColumnTitle = this.columns.find(c => c.id === oldColumn)?.title.toLowerCase() || '';
-
-            // If moving to a "done" column, complete the task
-            if ((newColumnTitle.includes('done') || newColumnTitle.includes('complete')) && task.progress < 100) {
-                task.progress = 100;
-            }
-            // If moving from a "done" column to an active column, set partial progress
-            else if (oldColumnTitle.includes('done') || oldColumnTitle.includes('complete')) {
-                task.progress = Math.max(task.progress - 10, 0);
-            }
-            // If moving to an "in progress" column from todo, set partial progress
-            else if ((newColumnTitle.includes('progress') || newColumnTitle.includes('doing')) && task.progress === 0) {
-                task.progress = 25;
-            }
         }
 
         seq.forEach((t, i) => { t.order = i; });
@@ -2089,6 +2189,145 @@ class Kanvu {
         this.commit();
         this.showToast(changedColumn ? `Task moved to ${this.columns.find(c => c.id === newColumn)?.title}` : 'Task reordered', 'success');
         return true;
+    }
+
+    // Done checkbox: checking sets progress to 100%; unchecking restores the exact previous value
+    setTaskDone(task, done) {
+        if (!!task.done === done) return;
+        if (done) {
+            task.prevProgress = task.progress;
+            task.progress = 100;
+            task.done = true;
+        } else {
+            task.progress = task.prevProgress !== undefined ? task.prevProgress : task.progress;
+            task.done = false;
+            delete task.prevProgress;
+        }
+        task.updatedAt = new Date().toISOString();
+    }
+
+    toggleDone(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+        this.setTaskDone(task, !task.done);
+        this.renderBoard();
+        this.commit();
+    }
+
+    // Stage menu: if any card in the stage is not done, mark them all done; otherwise mark them all undone
+    toggleAllDone(columnId) {
+        const list = this.tasks.filter(t => t.column === columnId && !t.archived);
+        if (!list.length) return;
+        const markDone = list.some(t => !t.done);
+        list.forEach(t => this.setTaskDone(t, markDone));
+        this.renderBoard();
+        this.commit();
+        this.showToast(markDone ? 'All cards in this stage marked as done' : 'All cards in this stage marked as undone', 'success');
+    }
+
+    // ───────────── Archive ─────────────
+    archiveTask(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || task.archived) return;
+        task.archived = true;
+        task.archivedAt = new Date().toISOString();
+        this.renderBoard();
+        this.commit();
+        this.showToast('Task archived', 'success');
+    }
+
+    archiveAllDone() {
+        const list = this.tasks.filter(t => t.done && !t.archived);
+        if (!list.length) {
+            this.showToast('No tasks marked as done', 'info');
+            return;
+        }
+        this.showConfirmDialog('Archive done tasks', `Archive ${list.length} task${list.length === 1 ? '' : 's'} marked as done?\n\nYou can restore them from Archived cards.`, (confirmed) => {
+            if (!confirmed) return;
+            const now = new Date().toISOString();
+            list.forEach(t => { t.archived = true; t.archivedAt = now; });
+            this.renderBoard();
+            this.commit();
+            document.body.classList.remove('rail-open');
+            this.showToast(`Archived ${list.length} task${list.length === 1 ? '' : 's'}`, 'success');
+        });
+    }
+
+    restoreTask(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || !task.archived) return;
+        // Back to its original stage, or the first stage if that one no longer exists
+        if (!this.columns.some(c => c.id === task.column)) {
+            task.column = [...this.columns].sort((a, b) => a.order - b.order)[0].id;
+        }
+        task.order = this.sortedTasksInColumn(task.column).length; // bottom of the stage
+        delete task.archived;
+        delete task.archivedAt;
+        this.renderBoard();
+        this.commit();
+        this.showToast('Task restored', 'success');
+    }
+
+    clearArchive() {
+        const n = this.tasks.filter(t => t.archived).length;
+        if (!n) return;
+        this.showConfirmDialog('Clear archive', `Permanently delete ${n} archived task${n === 1 ? '' : 's'}?\n\nThis action cannot be undone.`, (confirmed) => {
+            if (!confirmed) return;
+            this.tasks = this.tasks.filter(t => !t.archived);
+            this.renderBoard();
+            this.commit();
+            this.showToast('Archive cleared', 'info');
+        });
+    }
+
+    openArchiveModal() {
+        document.body.classList.remove('rail-open');
+        let modal = document.getElementById('archive-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'archive-modal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content modal-compact">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Archived cards</h2>
+                        <button class="modal-close" onclick="kanban.closeArchiveModal()">×</button>
+                    </div>
+                    <div class="board-actions-row">
+                        <button class="btn btn-sm btn-secondary" id="archive-clear" onclick="kanban.clearArchive()">Clear archive</button>
+                    </div>
+                    <div id="archive-list"></div>
+                </div>`;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) this.closeArchiveModal(); });
+        }
+        this.refreshArchiveModal();
+        modal.classList.add('show');
+    }
+
+    closeArchiveModal() {
+        const modal = document.getElementById('archive-modal');
+        if (modal) modal.classList.remove('show');
+    }
+
+    refreshArchiveModal() {
+        const modal = document.getElementById('archive-modal');
+        if (!modal) return;
+        const list = this.tasks.filter(t => t.archived)
+            .sort((a, b) => new Date(b.archivedAt || 0) - new Date(a.archivedAt || 0));
+        modal.querySelector('#archive-clear').disabled = !list.length;
+        modal.querySelector('#archive-list').innerHTML = list.length ? list.map(t => {
+            const stage = this.columns.find(c => c.id === t.column)?.title || '';
+            const when = t.archivedAt ? new Date(t.archivedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Unknown';
+            return `
+                <div class="archive-item">
+                    <div class="archive-info">
+                        <span class="archive-title">${this.escapeHtml(t.title)}</span>
+                        <span class="archive-meta">${stage ? this.escapeHtml(stage) + ' · ' : ''}Archived ${when}</span>
+                    </div>
+                    <button class="btn-compact" onclick="kanban.restoreTask('${t.id}')">Restore</button>
+                </div>`;
+        }).join('') : '<div class="empty-state-compact">No archived cards</div>';
     }
 
     // Search
@@ -2112,7 +2351,7 @@ class Kanvu {
             return;
         }
         
-        const matches = this.tasks.filter(task => 
+        const matches = this.tasks.filter(task => !task.archived && 
             task.title.toLowerCase().includes(this.searchTerm) ||
             task.description.toLowerCase().includes(this.searchTerm) ||
             (task.categories && task.categories.some(cat => cat.toLowerCase().includes(this.searchTerm)))
@@ -2160,6 +2399,7 @@ class Kanvu {
         const lanes = sorted.map((column, i) => {
             const id = column.id;
             const tasks = this.sortedTasksInColumn(id);
+            const allDone = tasks.length > 0 && tasks.every(t => t.done);
             return `
             <section class="column lane" id="lane-${id}" data-column="${id}" style="--c:${column.color || '#8A96AB'}">
                 <div class="lane-head">
@@ -2169,6 +2409,8 @@ class Kanvu {
                         <div class="column-menu-container">
                             <button class="btn-icon column-menu-btn" onclick="kanban.toggleColumnMenu('${id}')" title="Stage options" aria-label="Stage options">⋯</button>
                             <div class="column-menu" id="menu-${id}">
+                                <button class="column-menu-item" onclick="kanban.toggleAllDone('${id}'); kanban.closeColumnMenus();" ${tasks.length ? '' : 'disabled'}>${allDone ? 'Mark all as undone' : 'Mark all as done'}</button>
+                                <div class="column-menu-sep" role="separator"></div>
                                 <button class="column-menu-item" onclick="kanban.moveColumnLeft('${id}'); kanban.closeColumnMenus();" ${i === 0 ? 'disabled' : ''}>${horiz ? '← Move left' : '↑ Move up'}</button>
                                 <button class="column-menu-item" onclick="kanban.moveColumnRight('${id}'); kanban.closeColumnMenus();" ${i === sorted.length - 1 ? 'disabled' : ''}>${horiz ? '→ Move right' : '↓ Move down'}</button>
                                 <button class="column-menu-item" onclick="kanban.editColumn('${id}'); kanban.closeColumnMenus();">Rename or recolor</button>
@@ -2193,6 +2435,7 @@ class Kanvu {
         });
 
         this.renderRail();
+        this.refreshArchiveModal();
         if (this.searchTerm) this.filterTasks();
     }
 
@@ -2204,17 +2447,42 @@ class Kanvu {
             const b = this.savedBoards[id];
             const cur = id === this.currentBoardId;
             const name = this.escapeHtml(cur ? this.currentBoardName : b.name);
-            const n = cur ? this.tasks.length : (b.tasks || []).length;
+            const n = cur ? this.tasks.filter(t => !t.archived).length : (b.tasks || []).filter(t => !t.archived).length;
             return `<button class="rail-item${cur ? ' on' : ''}" ${cur ? '' : `onclick="kanban.switchToBoard('${id}')"`}><span class="g">${name}</span><em>${n}</em></button>`;
         }).join('');
         const sorted = [...this.columns].sort((a, b) => a.order - b.order);
         lanes.innerHTML = sorted.map(c => {
-            const n = this.tasks.filter(t => t.column === c.id).length;
-            return `<button class="rail-item" onclick="kanban.goToLane('${c.id}')"><span class="d" style="--c:${c.color || '#8A96AB'}"></span><span class="g">${this.escapeHtml(c.title)}</span><em>${n}</em></button>`;
+            const n = this.tasks.filter(t => t.column === c.id && !t.archived).length;
+            return `<div class="rail-item static"><span class="d" style="--c:${c.color || '#8A96AB'}"></span><span class="g">${this.escapeHtml(c.title)}</span><em>${n}</em></div>`;
         }).join('');
-        const done = this.tasks.filter(t => t.progress >= 100).length;
+        const active = this.tasks.filter(t => !t.archived);
+        const done = active.filter(t => t.progress >= 100).length;
         const summary = document.getElementById('summary');
-        if (summary) summary.textContent = `${this.tasks.length} tasks, ${done} finished`;
+        if (summary) summary.textContent = `${active.length} tasks, ${done} finished`;
+        const doneCount = active.filter(t => t.done).length;
+        const archivedCount = this.tasks.length - active.length;
+        const setBadge = (id, n) => {
+            const b = document.getElementById(id);
+            const badge = b && b.querySelector('.badge');
+            if (!badge) return;
+            badge.textContent = n > 99 ? '99+' : n;
+            badge.hidden = !n;
+        };
+        setBadge('archive-done-button', doneCount);
+        setBadge('archived-button', archivedCount);
+        const doneBtn = document.getElementById('archive-done-button');
+        if (doneBtn) {
+            doneBtn.classList.toggle('is-idle', !doneCount);
+            const t = doneCount ? `Archive ${doneCount} done task${doneCount === 1 ? '' : 's'}` : 'Archive all done tasks (none marked as done yet)';
+            doneBtn.title = t;
+            doneBtn.setAttribute('aria-label', t);
+        }
+        const arcBtn = document.getElementById('archived-button');
+        if (arcBtn) {
+            const t = archivedCount ? `Archived cards (${archivedCount})` : 'Archived cards';
+            arcBtn.title = t;
+            arcBtn.setAttribute('aria-label', t);
+        }
     }
 
     renderTaskCard(task) {
@@ -2222,14 +2490,18 @@ class Kanvu {
         const prio = { high: 'High', medium: 'Med', low: 'Low' }[task.priority] || task.priority;
         const pips = [1, 2, 3, 4, 5].map(n => `<i class="${n <= task.difficulty ? 'f' : ''}"></i>`).join('');
         return `
-            <article class="task-card${color ? ' colored' : ''}" data-task-id="${task.id}" ${color ? `style="--tc:${color}"` : ''}>
+            <article class="task-card${color ? ' colored' : ''}${task.done ? ' done' : ''}" data-task-id="${task.id}" ${color ? `style="--tc:${color}"` : ''}>
                 <div class="t-main">
-                    <h3 class="task-title">${this.escapeHtml(task.title)}</h3>
+                    <div class="t-head">
+                        <input type="checkbox" class="t-check" ${task.done ? 'checked' : ''} onchange="kanban.toggleDone('${task.id}')" title="Mark as done" aria-label="Mark task as done">
+                        <h3 class="task-title">${this.escapeHtml(task.title)}</h3>
+                    </div>
                     ${task.description ? `<p class="task-description">${this.escapeHtml(task.description)}</p>` : ''}
                 </div>
                 <div class="t-side">
                     <span class="t-pct">${task.progress}%</span>
                     <span class="t-actions">
+                        ${task.done ? `<button onclick="kanban.archiveTask('${task.id}')" title="Archive" aria-label="Archive task"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="3.5" rx="1"/><path d="M2.5 6v6.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6M6.5 9h3"/></svg></button>` : ''}
                         <button onclick="kanban.openTaskModal('${task.column}', '${task.id}')" title="Edit" aria-label="Edit task">✎</button>
                         <button onclick="kanban.deleteTask('${task.id}')" title="Delete" aria-label="Delete task">×</button>
                     </span>
@@ -2278,11 +2550,13 @@ class Kanvu {
 
     onPointerDown(e) {
         if (this.drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
-        const card = e.target.closest('.task-card');
+        const taskCard = e.target.closest('.task-card');
+        const head = taskCard ? null : e.target.closest('.lane-head');
+        const card = taskCard || (head && head.closest('.column'));
         if (!card || e.target.closest('button, a, input, textarea, select')) return;
 
         this.drag = {
-            card, type: e.pointerType, id: e.pointerId,
+            card, kind: taskCard ? 'card' : 'stage', type: e.pointerType, id: e.pointerId,
             x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY,
             active: false, ending: false, dirty: false, timer: null
         };
@@ -2337,13 +2611,18 @@ class Kanvu {
         d.dirty = true;
         d.offX = d.startX - rect.left;
         d.offY = d.startY - rect.top;
+        const isStage = d.kind === 'stage';
         d.origin = { parent: card.parentNode, next: card.nextElementSibling };
-        d.zone = card.parentNode;
+        d.zone = isStage ? null : card.parentNode;
 
         // Floating clone that follows the pointer
         const ghost = card.cloneNode(true);
         ghost.removeAttribute('data-task-id');
+        ghost.removeAttribute('id');
+        ghost.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+        ghost.querySelectorAll('.column-menu.show').forEach(n => n.classList.remove('show'));
         ghost.setAttribute('aria-hidden', 'true');
+        if (isStage) ghost.classList.add('stage-ghost');
         ghost.classList.add('drag-ghost');
         ghost.style.width = rect.width + 'px';
         ghost.style.height = rect.height + 'px';
@@ -2354,9 +2633,11 @@ class Kanvu {
         d.ghost = ghost;
 
         // The original becomes the slot that shows where the card will land
-        card.classList.add('is-placeholder');
-        d.zone.classList.add('drag-over');
+        this.closeColumnMenus();
+        card.classList.add(isStage ? 'is-placeholder-lane' : 'is-placeholder');
+        if (d.zone) d.zone.classList.add('drag-over');
         document.body.classList.add('is-dragging');
+        if (isStage) document.body.classList.add('is-dragging-stage');
         if (d.type === 'touch' && navigator.vibrate) navigator.vibrate(8);
 
         this.dragFrame();
@@ -2428,7 +2709,33 @@ class Kanvu {
         return null;
     }
 
+    // Stage drag: the dashed slot moves to the stage under the pointer (before or after it)
+    updateStagePlacement() {
+        const d = this.drag;
+        const board = document.querySelector('.board');
+        const ph = d.card;
+        const under = document.elementFromPoint(d.x, d.y);
+        if (!under || !board.contains(under)) return;
+
+        let ref;
+        const other = under.closest('.column');
+        if (other && other !== ph) {
+            const r = other.getBoundingClientRect();
+            const cols = getComputedStyle(board).gridTemplateColumns;
+            const sideBySide = getComputedStyle(board).display === 'grid' && cols.split(' ').length > 1;
+            const before = sideBySide ? d.x < r.left + r.width / 2 : d.y < r.top + r.height / 2;
+            ref = before ? other : other.nextElementSibling;
+        } else if (under.closest('.add-lane')) {
+            ref = under.closest('.add-lane'); // end of the list
+        } else {
+            return; // over a gap or the slot itself: keep the current position
+        }
+        if (ref === ph || ref === ph.nextElementSibling) return; // already projected here
+        this.flipMove(() => board.insertBefore(ph, ref), null);
+    }
+
     updatePlacement() {
+        if (this.drag.kind === 'stage') { this.updateStagePlacement(); return; }
         const d = this.drag;
         const under = document.elementFromPoint(d.x, d.y);
         const col = under && under.closest('.column');
@@ -2534,7 +2841,35 @@ class Kanvu {
         setTimeout(end, 400); // safety net if transitionend never fires
     }
 
+    endStageDrag() {
+        const d = this.drag;
+        d.ending = true;
+        cancelAnimationFrame(d.raf);
+        this.teardownDragListeners();
+
+        this.landGhost(() => {
+            const board = document.querySelector('.board');
+            const ids = [...board.querySelectorAll(':scope > .column')].map(c => c.dataset.column);
+            const before = [...this.columns].sort((a, b) => a.order - b.order).map(c => c.id);
+            const changed = ids.some((id, i) => id !== before[i]);
+
+            this.holdScrollSnap();
+            document.body.classList.remove('is-dragging', 'is-dragging-stage');
+            if (changed) {
+                ids.forEach((id, i) => { const c = this.columns.find(x => x.id === id); if (c) c.order = i; });
+                this.renderBoard();      // ghost sits exactly over the new stage, so this is seamless
+                this.commit();
+                this.showToast('Stage moved', 'success');
+            } else {
+                d.card.classList.remove('is-placeholder-lane');
+            }
+            d.ghost.remove();
+            this.drag = null;
+        });
+    }
+
     endDrag() {
+        if (this.drag.kind === 'stage') { this.endStageDrag(); return; }
         const d = this.drag;
         d.ending = true;
         cancelAnimationFrame(d.raf);
@@ -2593,16 +2928,17 @@ class Kanvu {
 
         d.ending = true;
         cancelAnimationFrame(d.raf);
+        const isStage = d.kind === 'stage';
         const ph = d.card, { parent, next } = d.origin;
         if (ph.parentNode !== parent || ph.nextElementSibling !== next) {
-            this.flipMove(() => parent.insertBefore(ph, next), ph);
-            this.setDragOver(parent);
+            this.flipMove(() => parent.insertBefore(ph, next), isStage ? null : ph);
+            if (!isStage) this.setDragOver(parent);
         }
         this.landGhost(() => {
             this.holdScrollSnap();
-            document.body.classList.remove('is-dragging');
+            document.body.classList.remove('is-dragging', 'is-dragging-stage');
             document.querySelectorAll('.tasks-container.drag-over').forEach(z => z.classList.remove('drag-over'));
-            ph.classList.remove('is-placeholder');
+            ph.classList.remove('is-placeholder', 'is-placeholder-lane');
             d.ghost.remove();
             this.drag = null;
         });
