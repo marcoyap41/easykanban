@@ -1,4 +1,4 @@
-class EasyKanban {
+class Kanvu {
     constructor() {
         this.tasks = [];
         this.columns = [
@@ -344,7 +344,7 @@ class EasyKanban {
     // The wallpaper image is a Blob in IndexedDB (too big for localStorage next to the boards)
     wpDb() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open('easykanban', 1);
+            const req = indexedDB.open('kanvu', 1);
             req.onupgradeneeded = () => req.result.createObjectStore('kv');
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
@@ -2809,4 +2809,4 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Initialize the application
-const kanban = new EasyKanban();
+const kanban = new Kanvu();
