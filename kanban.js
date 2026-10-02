@@ -1238,7 +1238,6 @@ class Kanvu {
                         <div class="board-actions-row">
                             <button class="btn btn-sm" onclick="kanban.createNewBoard()">New board</button>
                             <button class="btn btn-sm btn-secondary" onclick="kanban.duplicateCurrentBoard()">Duplicate board</button>
-                            <button class="btn btn-sm btn-secondary btn-danger-outline" onclick="kanban.deleteBoard(kanban.currentBoardId)" title="Move the board that is open now to the trash">Delete this board</button>
                         </div>
                         <div class="boards-list-compact" id="saved-boards-list-compact"></div>
                         <div id="board-trash"></div>
@@ -1381,7 +1380,7 @@ class Kanvu {
                         ${cur
                             ? `<span class="board-save-status">${this.getCompactSaveInfo()}</span>`
                             : `<button class="btn-compact" onclick="kanban.switchToBoard('${boardId}')" title="Open">Open</button>`}
-                        <button class="btn-compact btn-danger" onclick="kanban.deleteBoard('${boardId}')" title="Move to trash" aria-label="Move to trash">×</button>
+                        <button class="btn-compact btn-danger" onclick="kanban.deleteBoard('${boardId}')" ${ids.length <= 1 ? 'disabled' : ''} title="${ids.length <= 1 ? 'Cannot delete the last board' : 'Move to trash'}" aria-label="Move to trash">×</button>
                     </div>
                 </div>
             `;
@@ -1497,6 +1496,11 @@ class Kanvu {
     deleteBoard(boardId) {
         const stored = this.savedBoards[boardId];
         if (!stored) return;
+        // There must always be at least one board
+        if (Object.keys(this.savedBoards).length <= 1) {
+            this.showToast('Cannot delete the last board', 'error');
+            return;
+        }
         const isCurrent = boardId === this.currentBoardId;
         // The open board goes to the trash exactly as it is right now, unsaved edits included
         const board = isCurrent
@@ -1522,12 +1526,6 @@ class Kanvu {
             }
             delete this.savedBoards[boardId];
             const changed = [];
-            if (isCurrent && !nextId) {
-                const now = new Date().toISOString();
-                nextId = this.generateBoardId('My Projects');
-                this.savedBoards[nextId] = { id: nextId, name: 'My Projects', tasks: [], columns: this.defaultColumns(), lastModified: now, createdAt: now };
-                changed.push(nextId);
-            }
             if (!this.saveBoardsToStorage(changed, [boardId])) {
                 this.savedBoards[boardId] = stored; // keep it if the write failed
                 if (changed.length) delete this.savedBoards[nextId];
