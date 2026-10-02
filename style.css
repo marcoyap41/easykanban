@@ -352,3 +352,9 @@ box-shadow:0 1px 3px rgba(0,0,0,.18)}
 #board-manager-modal.anchored .modal-content{width:min(520px,calc(100vw - 24px))}
 .board-item-right{flex:none}
 .board-item-right :is(.board-save-status,.board-stats){white-space:nowrap}
+
+.brand img {
+    width: 24px;
+    height: 30px;
+    object-fit: contain;
+}
